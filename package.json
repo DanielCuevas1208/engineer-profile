@@ -1,0 +1,54 @@
+{
+  "name": "engineer-profile",
+  "version": "0.1.0",
+  "description": "Self-maintaining engineering portfolio from repository activity",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "engineer-profile": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run --config vitest.config.mjs",
+    "test:watch": "vitest --config vitest.config.mjs",
+    "typecheck": "tsc --noEmit",
+    "demo": "npm run build && node dist/index.js demo",
+    "ingest": "npm run build && node dist/index.js ingest",
+    "publish": "npm run build && node dist/index.js publish",
+    "capture": "npm run build && node dist/index.js capture"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "portfolio",
+    "github",
+    "changelog",
+    "playwright",
+    "engineering"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/demo-engineer/engineer-profile"
+  },
+  "bugs": {
+    "url": "https://github.com/demo-engineer/engineer-profile/issues"
+  },
+  "homepage": "https://github.com/demo-engineer/engineer-profile#readme",
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.1",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.4",
+    "playwright": "^1.50.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

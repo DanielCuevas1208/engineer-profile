@@ -1,0 +1,50 @@
+[
+  {
+    "sha": "a1b2c3d4e5f6789012345678901234567890abcd",
+    "commit": {
+      "message": "feat(router): add channel priority queues\n\nSupport priority levels 0-3 for event routing.",
+      "author": {
+        "name": "Demo Engineer",
+        "email": "engineer@example.com",
+        "date": "2026-07-15T14:22:00Z"
+      }
+    },
+    "html_url": "https://github.com/demo-engineer/signal-router/commit/a1b2c3d"
+  },
+  {
+    "sha": "b2c3d4e5f6789012345678901234567890abcde1",
+    "commit": {
+      "message": "fix(backpressure): drop oldest when buffer full",
+      "author": {
+        "name": "Demo Engineer",
+        "email": "engineer@example.com",
+        "date": "2026-07-10T09:15:00Z"
+      }
+    },
+    "html_url": "https://github.com/demo-engineer/signal-router/commit/b2c3d4e"
+  },
+  {
+    "sha": "c3d4e5f6789012345678901234567890abcde12f",
+    "commit": {
+      "message": "docs: add routing topology diagram",
+      "author": {
+        "name": "Demo Engineer",
+        "email": "engineer@example.com",
+        "date": "2026-07-05T16:40:00Z"
+      }
+    },
+    "html_url": "https://github.com/demo-engineer/signal-router/commit/c3d4e5f"
+  },
+  {
+    "sha": "d4e5f6789012345678901234567890abcde12f34",
+    "commit": {
+      "message": "chore(ci): add typecheck to pipeline",
+      "author": {
+        "name": "Demo Engineer",
+        "email": "engineer@example.com",
+        "date": "2026-06-28T11:00:00Z"
+      }
+    },
+    "html_url": "https://github.com/demo-engineer/signal-router/commit/d4e5f67"
+  }
+]

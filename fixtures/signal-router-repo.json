@@ -1,0 +1,15 @@
+{
+  "id": 100001,
+  "name": "signal-router",
+  "full_name": "demo-engineer/signal-router",
+  "description": "Route events between services with typed channels and backpressure",
+  "html_url": "https://github.com/demo-engineer/signal-router",
+  "homepage": null,
+  "language": "TypeScript",
+  "stargazers_count": 42,
+  "forks_count": 7,
+  "pushed_at": "2026-07-15T14:22:00Z",
+  "topics": ["typescript", "messaging", "events"],
+  "default_branch": "main",
+  "private": false
+}

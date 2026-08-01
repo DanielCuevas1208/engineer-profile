@@ -1,0 +1,18 @@
+[
+  {
+    "id": 200001,
+    "tag_name": "v0.3.0",
+    "name": "Priority queues",
+    "body": "## Features\n- Channel priority queues (levels 0-3)\n- Configurable backpressure policy\n\n## Fixes\n- Buffer overflow when sink is slow",
+    "published_at": "2026-07-14T10:00:00Z",
+    "html_url": "https://github.com/demo-engineer/signal-router/releases/tag/v0.3.0"
+  },
+  {
+    "id": 200000,
+    "tag_name": "v0.2.0",
+    "name": "Typed channels",
+    "body": "Initial typed channel support with schema validation.",
+    "published_at": "2026-06-01T08:00:00Z",
+    "html_url": "https://github.com/demo-engineer/signal-router/releases/tag/v0.2.0"
+  }
+]

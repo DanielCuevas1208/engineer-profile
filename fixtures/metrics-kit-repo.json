@@ -1,0 +1,15 @@
+{
+  "id": 100002,
+  "name": "metrics-kit",
+  "full_name": "demo-engineer/metrics-kit",
+  "description": "Collect and export application metrics without external services",
+  "html_url": "https://github.com/demo-engineer/metrics-kit",
+  "homepage": null,
+  "language": "TypeScript",
+  "stargazers_count": 28,
+  "forks_count": 3,
+  "pushed_at": "2026-07-20T18:45:00Z",
+  "topics": ["metrics", "observability", "typescript"],
+  "default_branch": "main",
+  "private": false
+}

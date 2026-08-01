@@ -1,0 +1,38 @@
+[
+  {
+    "sha": "e5f6789012345678901234567890abcde12f3456",
+    "commit": {
+      "message": "feat(export): add JSON lines exporter",
+      "author": {
+        "name": "Demo Engineer",
+        "email": "engineer@example.com",
+        "date": "2026-07-20T18:45:00Z"
+      }
+    },
+    "html_url": "https://github.com/demo-engineer/metrics-kit/commit/e5f6789"
+  },
+  {
+    "sha": "f6789012345678901234567890abcde12f345678",
+    "commit": {
+      "message": "fix(counter): reset gauge on interval boundary",
+      "author": {
+        "name": "Demo Engineer",
+        "email": "engineer@example.com",
+        "date": "2026-07-18T12:30:00Z"
+      }
+    },
+    "html_url": "https://github.com/demo-engineer/metrics-kit/commit/f678901"
+  },
+  {
+    "sha": "6789012345678901234567890abcde12f3456789a",
+    "commit": {
+      "message": "test(registry): add deterministic snapshot tests",
+      "author": {
+        "name": "Demo Engineer",
+        "email": "engineer@example.com",
+        "date": "2026-07-12T08:00:00Z"
+      }
+    },
+    "html_url": "https://github.com/demo-engineer/metrics-kit/commit/6789012"
+  }
+]
