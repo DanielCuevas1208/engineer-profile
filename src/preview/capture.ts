@@ -72,7 +72,8 @@ export async function captureLocalHtml(
 
 export async function captureAllProjects(
   config: PortfolioConfig,
-  urlResolver: (slug: string, homepage: string | null, repoUrl: string) => string | null
+  urlResolver: (slug: string, homepage: string | null, repoUrl: string) => string | null,
+  onError?: (slug: string, error: Error) => void
 ): Promise<string[]> {
   const db = openDatabase(config.dataDir, config.clock);
   const captured: string[] = [];
@@ -80,7 +81,12 @@ export async function captureAllProjects(
     for (const project of db.listProjects(true)) {
       const target = urlResolver(project.slug, project.homepage, project.url);
       if (!target) continue;
-      captured.push(await captureScreenshot(config, { slug: project.slug, url: target }));
+      try {
+        captured.push(await captureScreenshot(config, { slug: project.slug, url: target }));
+      } catch (error) {
+        if (!onError) throw error;
+        onError(project.slug, error as Error);
+      }
     }
   } finally {
     db.close();

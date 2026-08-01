@@ -1,0 +1,44 @@
+name: Scheduled portfolio refresh
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engineer-profile-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Refresh portfolio
+        run: npm run refresh -- --config engineer-profile.config.json
+
+      - name: Store refreshed site
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineer-profile-refresh
+          path: output/
+          if-no-files-found: error

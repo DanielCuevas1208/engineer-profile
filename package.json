@@ -1,6 +1,6 @@
 {
   "name": "engineer-profile",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Self-maintaining engineering portfolio from repository activity",
   "type": "module",
   "main": "dist/index.js",
@@ -17,7 +17,8 @@
     "demo": "npm run build && node dist/index.js demo",
     "ingest": "npm run build && node dist/index.js ingest",
     "publish": "npm run build && node dist/index.js publish",
-    "capture": "npm run build && node dist/index.js capture"
+    "capture": "npm run build && node dist/index.js capture",
+    "refresh": "npm run build && node dist/index.js refresh"
   },
   "engines": {
     "node": ">=20"
@@ -32,12 +33,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/demo-engineer/engineer-profile"
+    "url": "https://github.com/DanielCuevas1208/engineer-profile.git"
   },
   "bugs": {
-    "url": "https://github.com/demo-engineer/engineer-profile/issues"
+    "url": "https://github.com/DanielCuevas1208/engineer-profile/issues"
   },
-  "homepage": "https://github.com/demo-engineer/engineer-profile#readme",
+  "homepage": "https://github.com/DanielCuevas1208/engineer-profile#readme",
   "dependencies": {
     "better-sqlite3": "^11.8.1",
     "commander": "^13.1.0"
