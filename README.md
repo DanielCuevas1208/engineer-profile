@@ -1,8 +1,8 @@
 # EngineerProfile
 
-EngineerProfile builds a local engineering portfolio from public repository evidence.
-It stores repository metadata, commits, releases, privacy choices, and preview paths in SQLite.
-It publishes a static site from those records.
+EngineerProfile builds a local engineering portfolio from public repository data.
+It stores repository metadata, commits, releases, privacy settings, and preview
+paths in SQLite. It publishes a static site from these records.
 
 ## Value
 
@@ -46,8 +46,8 @@ flowchart LR
 | `src/publish/` | Render HTML, changelog files, and preview assets. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
-The refresh path keeps each stage reusable.
-Capture failures become reported skips, so one unavailable project does not discard the whole snapshot.
+The refresh command runs each stage in a fixed order.
+If a preview fails, the command reports the skip and keeps the rest of the snapshot.
 
 ## Setup
 
@@ -80,7 +80,8 @@ Run a network-backed refresh with the checked-in settings:
 npm run refresh
 ```
 
-The refresh command ingests public repositories, captures previews, publishes HTML, and reports capture skips.
+The refresh command reads public repositories, captures previews, publishes HTML,
+and reports skipped captures.
 
 GitHub ingestion uses the public API.
 Set `GITHUB_TOKEN` for a higher rate limit.
