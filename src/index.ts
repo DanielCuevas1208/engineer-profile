@@ -1,34 +1,45 @@
 #!/usr/bin/env node
-import { Command } from "commander";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { Command } from "commander";
 import { ingestOwnerRepos, ingestRepository } from "./ingest/orchestrator.js";
 import { captureAllProjects, captureLocalHtml, closeBrowser } from "./preview/capture.js";
 import { copyScreenshotsToOutput, publishSite } from "./publish/site.js";
 import { loadAllFixtures } from "./fixtures/loader.js";
 import { openDatabase } from "./db/client.js";
 import { DEFAULT_CONFIG, type PortfolioConfig } from "./types.js";
+import { DEFAULT_CONFIG_PATH, loadPortfolioConfig } from "./config/loader.js";
+import { refreshPortfolio } from "./refresh/run.js";
 
 const program = new Command();
 
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.1.0");
+  .version("0.2.0");
 
-function resolveConfig(options: { data?: string; output?: string }): PortfolioConfig {
+function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
+  const base = options.config
+    ? loadPortfolioConfig(options.config)
+    : existsSync(DEFAULT_CONFIG_PATH)
+      ? loadPortfolioConfig(DEFAULT_CONFIG_PATH)
+      : DEFAULT_CONFIG;
   return {
-    ...DEFAULT_CONFIG,
-    dataDir: options.data ?? DEFAULT_CONFIG.dataDir,
-    outputDir: options.output ?? DEFAULT_CONFIG.outputDir,
+    ...base,
+    dataDir: options.data ?? base.dataDir,
+    outputDir: options.output ?? base.outputDir,
   };
 }
 
-program
+function addConfigOption(command: Command): Command {
+  return command.option("-c, --config <file>", "Configuration file");
+}
+
+addConfigOption(program
   .command("demo")
   .description("Run the complete fixture pipeline without network access")
-  .option("-d, --data <dir>", "Data directory", "data")
-  .option("-o, --output <dir>", "Output directory", "output")
+  .option("-d, --data <dir>", "Data directory")
+  .option("-o, --output <dir>", "Output directory")
   .action(async (options) => {
     const config = resolveConfig(options);
     mkdirSync(config.dataDir, { recursive: true });
@@ -57,37 +68,39 @@ program
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
     console.log("Open output/index.html in a browser.");
-  });
+  }));
 
-program
+addConfigOption(program
   .command("ingest")
   .description("Ingest public GitHub repositories")
-  .argument("<owner>", "GitHub owner or organization")
+  .argument("[owner]", "GitHub owner or organization")
   .option("-r, --repo <name>", "Single repository name")
-  .option("-l, --limit <n>", "Maximum repositories", "5")
-  .option("-d, --data <dir>", "Data directory", "data")
+  .option("-l, --limit <n>", "Maximum repositories")
+  .option("-d, --data <dir>", "Data directory")
   .option("--fixture", "Use local fixtures instead of the GitHub API")
   .action(async (owner, options) => {
     const config = resolveConfig(options);
+    const targetOwner = owner ?? config.owner;
+    const limit = Number.parseInt(options.limit ?? String(config.repositoryLimit ?? DEFAULT_CONFIG.repositoryLimit), 10);
     mkdirSync(config.dataDir, { recursive: true });
     if (options.fixture) {
-      const results = await ingestOwnerRepos(config, owner, 5, loadAllFixtures());
+      const results = await ingestOwnerRepos(config, targetOwner, limit, loadAllFixtures());
       console.log(`Ingested ${results.length} fixture projects.`);
       return;
     }
     if (options.repo) {
-      const result = await ingestRepository(config, { owner, repo: options.repo });
+      const result = await ingestRepository(config, { owner: targetOwner, repo: options.repo });
       console.log(`Ingested ${result.slug}: ${result.commitsAdded} new commits.`);
       return;
     }
-    const results = await ingestOwnerRepos(config, owner, Number.parseInt(options.limit, 10));
+    const results = await ingestOwnerRepos(config, targetOwner, limit);
     for (const result of results) console.log(`Ingested ${result.slug}: ${result.commitsAdded} new commits.`);
-  });
+  }));
 
-program
+addConfigOption(program
   .command("capture")
   .description("Capture project preview screenshots with Playwright")
-  .option("-d, --data <dir>", "Data directory", "data")
+  .option("-d, --data <dir>", "Data directory")
   .option("--fixture", "Capture local fixture pages")
   .action(async (options) => {
     const config = resolveConfig(options);
@@ -105,25 +118,43 @@ program
     }
     const paths = await captureAllProjects(config, (_slug, homepage, repoUrl) => homepage ?? repoUrl);
     console.log(`Captured ${paths.length} screenshots.`);
-  });
+  }));
 
-program
+addConfigOption(program
   .command("publish")
   .description("Generate the static portfolio from SQLite")
-  .option("-d, --data <dir>", "Data directory", "data")
-  .option("-o, --output <dir>", "Output directory", "output")
+  .option("-d, --data <dir>", "Data directory")
+  .option("-o, --output <dir>", "Output directory")
   .action((options) => {
     const config = resolveConfig(options);
     const result = publishSite(config);
     const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
-  });
+  }));
 
-program
+addConfigOption(program
+  .command("refresh")
+  .description("Ingest, capture, and publish from the checked-in configuration")
+  .option("-d, --data <dir>", "Data directory")
+  .option("-o, --output <dir>", "Output directory")
+  .action(async (options) => {
+    const config = resolveConfig(options);
+    mkdirSync(config.dataDir, { recursive: true });
+    const result = await refreshPortfolio(config);
+    console.log(`Ingested ${result.ingested} repositories for ${config.owner}.`);
+    console.log(`Captured ${result.captured} project previews.`);
+    console.log(`Published ${result.published.projectCount} projects to ${result.published.indexPath}.`);
+    console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+    for (const error of result.captureErrors) {
+      console.warn(`Skipped ${error.slug}: ${error.message}`);
+    }
+  }));
+
+addConfigOption(program
   .command("status")
   .description("Show project visibility and recent operations")
-  .option("-d, --data <dir>", "Data directory", "data")
+  .option("-d, --data <dir>", "Data directory")
   .action((options) => {
     const config = resolveConfig(options);
     const db = openDatabase(config.dataDir, config.clock);
@@ -144,14 +175,14 @@ program
     } finally {
       db.close();
     }
-  });
+  }));
 
-program
+addConfigOption(program
   .command("privacy")
   .description("Hide or show a project in the published site")
   .option("--hide <slug>", "Hide a project")
   .option("--show <slug>", "Show a project")
-  .option("-d, --data <dir>", "Data directory", "data")
+  .option("-d, --data <dir>", "Data directory")
   .action((options) => {
     const config = resolveConfig(options);
     const db = openDatabase(config.dataDir, config.clock);
@@ -167,6 +198,6 @@ program
     } finally {
       db.close();
     }
-  });
+  }));
 
 await program.parseAsync();

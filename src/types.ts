@@ -82,6 +82,7 @@ export interface PortfolioConfig {
   owner: string;
   title: string;
   tagline: string;
+  repositoryLimit?: number;
   dataDir: string;
   outputDir: string;
   privacy: PrivacyConfig;
@@ -94,12 +95,13 @@ export const DEFAULT_PRIVACY: PrivacyConfig = {
   maxCommitsPerProject: 50,
 };
 
-export const DEFAULT_CONFIG: PortfolioConfig = {
+export const DEFAULT_CONFIG = {
   owner: "demo-engineer",
   title: "EngineerProfile",
   tagline: "A living index of shipped systems, maintained from repository evidence",
+  repositoryLimit: 5,
   dataDir: "data",
   outputDir: "output",
   privacy: DEFAULT_PRIVACY,
   clock: () => new Date().toISOString(),
-};
+} satisfies PortfolioConfig;

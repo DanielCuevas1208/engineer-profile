@@ -11,22 +11,23 @@ It publishes a static site from those records.
 - Build release notes from releases or conventional commits.
 - Capture repeatable project previews with Playwright.
 - Hide projects and redact author emails before publication.
-- Inspect every ingest, capture, and publish operation.
+- Run one configured refresh from a scheduled workflow.
 
-The first release runs without secrets.
-The fixture demo needs no network access.
+The fixture demo runs without secrets and without network access.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
+  C[Checked-in config] --> R[Refresh]
   G[GitHub API] --> I[Ingest]
   F[Fixtures] --> I
+  R --> I
   I --> D[(SQLite)]
-  D --> C[Changelog]
+  D --> L[Changelog]
   D --> P[Privacy]
   D --> S[Playwright]
-  C --> W[Publisher]
+  L --> W[Publisher]
   P --> W
   S --> W
   W --> O[Static output]
@@ -34,6 +35,9 @@ flowchart LR
 
 | Area | Responsibility |
 | --- | --- |
+| `engineer-profile.config.json` | Store owner, presentation, refresh, paths, and privacy settings. |
+| `src/config/` | Validate checked-in JSON and merge safe defaults. |
+| `src/refresh/` | Coordinate ingest, best-effort capture, and static publishing. |
 | `src/ingest/` | Fetch public GitHub data and map it to records. |
 | `src/db/` | Store projects, commits, changelogs, and audit events. |
 | `src/changelog/` | Prefer release notes and fall back to commit groups. |
@@ -41,6 +45,9 @@ flowchart LR
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
 | `src/publish/` | Render HTML, changelog files, and preview assets. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
+
+The refresh path keeps each stage reusable.
+Capture failures become reported skips, so one unavailable project does not discard the whole snapshot.
 
 ## Setup
 
@@ -57,6 +64,34 @@ Open `output/index.html` in a browser.
 The demo creates a local SQLite database under `data/`.
 It writes the static site under `output/`.
 Both directories are ignored by Git.
+
+## Configuration
+
+`engineer-profile.config.json` is the checked-in source for scheduled refreshes.
+It sets the GitHub owner, site presentation, repository limit, paths, and privacy controls.
+
+The loader accepts repository limits from 1 through 100.
+It rejects malformed values before network access.
+CLI `--config`, `--data`, and `--output` options override file values.
+
+Run a network-backed refresh with the checked-in settings:
+
+```bash
+npm run refresh
+```
+
+The refresh command ingests public repositories, captures previews, publishes HTML, and reports capture skips.
+
+GitHub ingestion uses the public API.
+Set `GITHUB_TOKEN` for a higher rate limit.
+
+```powershell
+$env:GITHUB_TOKEN="your-token"
+npm run refresh
+```
+
+Do not put a token in repository files.
+Use `.env.example` as a variable reference.
 
 ## Sample output
 
@@ -82,26 +117,16 @@ Build before direct CLI commands.
 
 | Command | Result |
 | --- | --- |
-| `npm run demo` | Run the complete local fixture pipeline. |
-| `npm run ingest -- demo-engineer --fixture` | Load fixture records only. |
-| `npm run ingest -- octocat --limit 3` | Ingest up to three public repositories. |
+| `npm run demo` | Run the complete fixture pipeline. |
+| `npm run ingest -- octocat --limit 3` | Load public repository evidence. |
+| `npm run ingest -- --fixture` | Load fixture records only. |
 | `npm run capture -- --fixture` | Capture local fixture pages. |
 | `npm run publish` | Rebuild the site from SQLite. |
+| `npm run refresh` | Run configured ingest, capture, and publish stages. |
 | `node dist/index.js status` | Show visibility and recent operations. |
 | `npm test` | Run deterministic unit and integration tests. |
 | `npm run typecheck` | Validate TypeScript types. |
 | `npm run build` | Compile the CLI to `dist/`. |
-
-GitHub ingestion uses the public API.
-Set `GITHUB_TOKEN` for a higher rate limit.
-
-```powershell
-$env:GITHUB_TOKEN="your-token"
-npm run ingest -- octocat --limit 3
-```
-
-Do not put a token in repository files.
-Use `.env.example` as a variable reference.
 
 ## Privacy controls
 
@@ -129,20 +154,26 @@ It links project cards to repositories.
 It links release notes to their release pages.
 It records local operations in an audit table.
 
-## Evaluation evidence
+## CI and test status
+
+The regular CI workflow runs typecheck, build, tests, the fixture demo, and artifact upload.
+The scheduled refresh workflow runs each Monday and supports manual dispatch.
+It uploads the generated site as a workflow artifact.
 
 The test suite covers these core behaviors:
 
+- Configuration validation and default merging.
 - Conventional commit parsing.
 - Release-first changelog generation.
 - SQLite upserts and changelog replacement.
 - Privacy filtering and email redaction.
 - Fixture ingestion and static publishing.
+- Configured refresh orchestration.
 - Release source links.
 - Deterministic HTML output.
 - Playwright screenshot capture.
 
-CI runs typecheck, build, tests, the fixture demo, and artifact upload.
+Run the local checks:
 
 ```bash
 npm run typecheck
@@ -150,12 +181,11 @@ npm run build
 npm test
 ```
 
-## Test status
+### Validation status
 
-`npm run typecheck` passes.
-`npm run build` passes.
-`npm test` runs the full suite.
-CI runs the same checks on Ubuntu with Chromium installed.
+Typecheck and build pass locally.
+CI runs the complete test suite on Ubuntu with Chromium installed.
+The fixture pipeline provides deterministic data for repeatable checks.
 
 ## Limitations
 
@@ -163,17 +193,19 @@ CI runs the same checks on Ubuntu with Chromium installed.
 - Public API calls have rate limits without a token.
 - Capture needs a local Chromium installation.
 - Changelog quality depends on releases or conventional commits.
+- External pages can fail during capture.
+- Capture failures are reported and do not stop publishing.
 - Publishing creates local files. It does not deploy them.
-- The first release does not schedule refreshes.
+- Scheduled runs upload artifacts. They do not commit generated output.
 
 ## Roadmap
 
-| Release | Scope |
-| --- | --- |
-| v0.1 | Fixture demo, GitHub ingest, changelog, capture, publish, and privacy controls. |
-| v0.2 | Scheduled refresh and a checked-in configuration file. |
-| v0.3 | Custom themes and deployment adapters. |
-| v0.4 | Commit-diff summaries and an RSS feed. |
+| Release | Status | Scope |
+| --- | --- | --- |
+| v0.1 | Complete | Fixture demo, GitHub ingest, changelog, capture, publish, and privacy controls. |
+| v0.2 | Complete | Checked-in configuration, coordinated refresh command, and scheduled artifact workflow. |
+| v0.3 | Next | Custom themes and deployment adapters. |
+| v0.4 | Later | Commit-diff summaries and an RSS feed. |
 
 ## License
 
