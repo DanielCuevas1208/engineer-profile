@@ -41,7 +41,7 @@
   "homepage": "https://github.com/DanielCuevas1208/engineer-profile#readme",
   "dependencies": {
     "better-sqlite3": "^11.8.1",
-    "commander": "^13.1.0"
+    "commander": "^15.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.1",
