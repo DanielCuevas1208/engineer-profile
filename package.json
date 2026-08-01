@@ -45,7 +45,7 @@
   "devDependencies": {
     "@playwright/test": "^1.50.1",
     "@types/better-sqlite3": "^7.6.12",
-    "@types/node": "^22.13.4",
+    "@types/node": "^26.1.2",
     "playwright": "^1.50.1",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",
