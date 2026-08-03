@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import type { PortfolioConfig, PrivacyConfig } from "../types.js";
 import { DEFAULT_CONFIG, DEFAULT_PRIVACY } from "../types.js";
 import { mergePrivacy } from "../privacy/controls.js";
+import { availableThemeNames, isKnownTheme } from "../publish/themes.js";
 
 export const DEFAULT_CONFIG_PATH = "engineer-profile.config.json";
 
@@ -27,6 +28,17 @@ function readLimit(source: ConfigValue, key: string, fallback: number): number {
     throw new Error(`Configuration field "${key}" must be an integer from 1 to 100.`);
   }
   return value;
+}
+
+function readTheme(source: ConfigValue, key: string, fallback: string): string {
+  if (!(key in source)) return fallback;
+  const value = source[key];
+  if (typeof value !== "string" || value.trim() === "" || !isKnownTheme(value.trim())) {
+    throw new Error(
+      `Configuration field "${key}" must be one of: ${availableThemeNames().join(", ")}.`
+    );
+  }
+  return value.trim();
 }
 
 function readPrivacy(source: ConfigValue): PrivacyConfig {
@@ -78,6 +90,7 @@ export function loadPortfolioConfig(
     repositoryLimit: readLimit(parsed, "repositoryLimit", DEFAULT_CONFIG.repositoryLimit),
     dataDir: readString(parsed, "dataDir", DEFAULT_CONFIG.dataDir),
     outputDir: readString(parsed, "outputDir", DEFAULT_CONFIG.outputDir),
+    theme: readTheme(parsed, "theme", DEFAULT_CONFIG.theme ?? "default"),
     privacy: readPrivacy(parsed),
     clock,
   };

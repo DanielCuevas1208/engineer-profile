@@ -5,6 +5,7 @@
   "repositoryLimit": 5,
   "dataDir": "data",
   "outputDir": "output",
+  "theme": "default",
   "privacy": {
     "hiddenProjects": [],
     "redactEmails": true,

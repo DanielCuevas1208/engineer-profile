@@ -85,6 +85,7 @@ export interface PortfolioConfig {
   repositoryLimit?: number;
   dataDir: string;
   outputDir: string;
+  theme?: string;
   privacy: PrivacyConfig;
   clock: () => string;
 }
@@ -102,6 +103,7 @@ export const DEFAULT_CONFIG = {
   repositoryLimit: 5,
   dataDir: "data",
   outputDir: "output",
+  theme: "default",
   privacy: DEFAULT_PRIVACY,
   clock: () => new Date().toISOString(),
 } satisfies PortfolioConfig;

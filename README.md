@@ -2,7 +2,7 @@
 
 EngineerProfile builds a local engineering portfolio from public repository data.
 It stores repository metadata, commits, releases, privacy settings, and preview
-paths in SQLite. It publishes a static site from these records.
+paths in SQLite. It publishes a static site from these records with a named theme.
 
 ## Value
 
@@ -43,7 +43,8 @@ flowchart LR
 | `src/changelog/` | Prefer release notes and fall back to commit groups. |
 | `src/privacy/` | Hide projects and block sensitive commit messages. |
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
-| `src/publish/` | Render HTML, changelog files, and preview assets. |
+| `src/publish/site.ts` | Render HTML, changelog files, and preview assets. |
+| `src/publish/themes.ts` | Register named themes and resolve presentation settings. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
 The refresh command runs each stage in a fixed order.
@@ -51,7 +52,7 @@ If a preview fails, the command reports the skip and keeps the rest of the snaps
 
 ## Setup
 
-Use Node.js 20 or newer.
+Use Node.js 22 or newer.
 
 ```bash
 npm ci
@@ -74,6 +75,10 @@ The loader accepts repository limits from 1 through 100.
 It rejects malformed values before network access.
 CLI `--config`, `--data`, and `--output` options override file values.
 
+The `theme` field selects a named presentation.
+Valid names are `default` and `light`.
+Omit the field to use the default theme.
+
 Run a network-backed refresh with the checked-in settings:
 
 ```bash
@@ -93,6 +98,22 @@ npm run refresh
 
 Do not put a token in repository files.
 Use `.env.example` as a variable reference.
+
+## Themes
+
+Each theme defines the color scheme and CSS variables for the published site.
+The `default` theme uses a dark palette with blue accents.
+The `light` theme uses pale panels with dark text.
+
+Build the demo in the light theme:
+
+```bash
+npm run demo -- --theme light
+```
+
+The `--theme` option works on the `demo`, `publish`, and `refresh` commands.
+It overrides the theme from the configuration file.
+An unknown theme name fails the command before any output is written.
 
 ## Sample output
 
@@ -119,6 +140,7 @@ Build before direct CLI commands.
 | Command | Result |
 | --- | --- |
 | `npm run demo` | Run the complete fixture pipeline. |
+| `npm run demo -- --theme light` | Run the demo with the light theme. |
 | `npm run ingest -- octocat --limit 3` | Load public repository evidence. |
 | `npm run ingest -- --fixture` | Load fixture records only. |
 | `npm run capture -- --fixture` | Capture local fixture pages. |
@@ -172,6 +194,7 @@ The test suite covers these core behaviors:
 - Configured refresh orchestration.
 - Release source links.
 - Deterministic HTML output.
+- Theme resolution and deterministic themed publishing.
 - Playwright screenshot capture.
 
 Run the local checks:
@@ -205,8 +228,11 @@ The fixture pipeline provides deterministic data for repeatable checks.
 | --- | --- | --- |
 | v0.1 | Complete | Fixture demo, GitHub ingest, changelog, capture, publish, and privacy controls. |
 | v0.2 | Complete | Checked-in configuration, coordinated refresh command, and scheduled artifact workflow. |
-| v0.3 | Next | Custom themes and deployment adapters. |
+| v0.3 | In progress | Named themes shipped. Deployment adapters remain. |
 | v0.4 | Later | Commit-diff summaries and an RSS feed. |
+
+v0.3 ships the `default` and `light` themes.
+Deployment adapters are the remaining part of v0.3.
 
 ## License
 

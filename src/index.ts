@@ -9,6 +9,7 @@ import { loadAllFixtures } from "./fixtures/loader.js";
 import { openDatabase } from "./db/client.js";
 import { DEFAULT_CONFIG, type PortfolioConfig } from "./types.js";
 import { DEFAULT_CONFIG_PATH, loadPortfolioConfig } from "./config/loader.js";
+import { resolveTheme } from "./publish/themes.js";
 import { refreshPortfolio } from "./refresh/run.js";
 
 const program = new Command();
@@ -16,9 +17,14 @@ const program = new Command();
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.2.0");
+  .version("0.3.0");
 
-function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
+function resolveConfig(options: {
+  config?: string;
+  data?: string;
+  output?: string;
+  theme?: string;
+}): PortfolioConfig {
   const base = options.config
     ? loadPortfolioConfig(options.config)
     : existsSync(DEFAULT_CONFIG_PATH)
@@ -28,6 +34,7 @@ function resolveConfig(options: { config?: string; data?: string; output?: strin
     ...base,
     dataDir: options.data ?? base.dataDir,
     outputDir: options.output ?? base.outputDir,
+    theme: options.theme ? resolveTheme(options.theme).name : base.theme,
   };
 }
 
@@ -35,7 +42,11 @@ function addConfigOption(command: Command): Command {
   return command.option("-c, --config <file>", "Configuration file");
 }
 
-addConfigOption(program
+function addThemeOption(command: Command): Command {
+  return command.option("-t, --theme <name>", "Presentation theme name");
+}
+
+addThemeOption(addConfigOption(program
   .command("demo")
   .description("Run the complete fixture pipeline without network access")
   .option("-d, --data <dir>", "Data directory")
@@ -68,7 +79,7 @@ addConfigOption(program
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
     console.log("Open output/index.html in a browser.");
-  }));
+  })));
 
 addConfigOption(program
   .command("ingest")
@@ -120,7 +131,7 @@ addConfigOption(program
     console.log(`Captured ${paths.length} screenshots.`);
   }));
 
-addConfigOption(program
+addThemeOption(addConfigOption(program
   .command("publish")
   .description("Generate the static portfolio from SQLite")
   .option("-d, --data <dir>", "Data directory")
@@ -131,9 +142,9 @@ addConfigOption(program
     const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
-  }));
+  })));
 
-addConfigOption(program
+addThemeOption(addConfigOption(program
   .command("refresh")
   .description("Ingest, capture, and publish from the checked-in configuration")
   .option("-d, --data <dir>", "Data directory")
@@ -149,7 +160,7 @@ addConfigOption(program
     for (const error of result.captureErrors) {
       console.warn(`Skipped ${error.slug}: ${error.message}`);
     }
-  }));
+  })));
 
 addConfigOption(program
   .command("status")
