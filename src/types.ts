@@ -78,6 +78,11 @@ export interface PrivacyConfig {
   maxCommitsPerProject: number;
 }
 
+export interface DeploymentConfig {
+  adapter?: string;
+  siteUrl?: string;
+}
+
 export interface PortfolioConfig {
   owner: string;
   title: string;
@@ -85,6 +90,8 @@ export interface PortfolioConfig {
   repositoryLimit?: number;
   dataDir: string;
   outputDir: string;
+  theme: string;
+  deploy: DeploymentConfig;
   privacy: PrivacyConfig;
   clock: () => string;
 }
@@ -102,6 +109,8 @@ export const DEFAULT_CONFIG = {
   repositoryLimit: 5,
   dataDir: "data",
   outputDir: "output",
+  theme: "midnight",
+  deploy: {},
   privacy: DEFAULT_PRIVACY,
   clock: () => new Date().toISOString(),
 } satisfies PortfolioConfig;

@@ -10,13 +10,14 @@ import { openDatabase } from "./db/client.js";
 import { DEFAULT_CONFIG, type PortfolioConfig } from "./types.js";
 import { DEFAULT_CONFIG_PATH, loadPortfolioConfig } from "./config/loader.js";
 import { refreshPortfolio } from "./refresh/run.js";
+import { prepareDeployment, deployAdapterIds } from "./deploy/run.js";
 
 const program = new Command();
 
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.2.0");
+  .version("0.3.0");
 
 function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
   const base = options.config
@@ -149,6 +150,25 @@ addConfigOption(program
     for (const error of result.captureErrors) {
       console.warn(`Skipped ${error.slug}: ${error.message}`);
     }
+  }));
+
+addConfigOption(program
+  .command("deploy")
+  .description("Prepare the published site for a static host")
+  .option("--adapter <id>", `Deployment adapter: ${deployAdapterIds().join(", ")}`)
+  .option("--site-url <url>", "Public URL for the deployed site")
+  .option("-d, --data <dir>", "Data directory")
+  .option("-o, --output <dir>", "Output directory")
+  .action((options) => {
+    const config = resolveConfig(options);
+    const result = prepareDeployment(config, {
+      adapter: options.adapter,
+      siteUrl: options.siteUrl,
+    });
+    console.log(`Prepared ${result.label} deployment in ${config.outputDir}.`);
+    for (const file of result.written) console.log(`Wrote ${file}.`);
+    console.log("Next steps:");
+    for (const instruction of result.instructions) console.log(`  ${instruction}`);
   }));
 
 addConfigOption(program

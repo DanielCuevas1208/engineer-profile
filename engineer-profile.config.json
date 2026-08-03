@@ -3,6 +3,7 @@
   "title": "EngineerProfile",
   "tagline": "A living index of shipped systems, maintained from repository evidence",
   "repositoryLimit": 5,
+  "theme": "midnight",
   "dataDir": "data",
   "outputDir": "output",
   "privacy": {

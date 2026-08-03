@@ -11,6 +11,8 @@ paths in SQLite. It publishes a static site from these records.
 - Build release notes from releases or conventional commits.
 - Capture repeatable project previews with Playwright.
 - Hide projects and redact author emails before publication.
+- Switch the published presentation between built-in themes.
+- Prepare the published site for GitHub Pages, Netlify, or Vercel.
 - Run one configured refresh from a scheduled workflow.
 
 The fixture demo runs without secrets and without network access.
@@ -31,12 +33,16 @@ flowchart LR
   P --> W
   S --> W
   W --> O[Static output]
+  O --> E[Deploy]
+  E --> H[Host files]
 ```
 
 | Area | Responsibility |
 | --- | --- |
-| `engineer-profile.config.json` | Store owner, presentation, refresh, paths, and privacy settings. |
+| `engineer-profile.config.json` | Store owner, presentation, refresh, theme, deploy, and privacy settings. |
 | `src/config/` | Validate checked-in JSON and merge safe defaults. |
+| `src/theme/` | Provide the palette and typography for each published theme. |
+| `src/deploy/` | Prepare the published site for a static host. |
 | `src/refresh/` | Coordinate ingest, best-effort capture, and static publishing. |
 | `src/ingest/` | Fetch public GitHub data and map it to records. |
 | `src/db/` | Store projects, commits, changelogs, and audit events. |
@@ -51,7 +57,7 @@ If a preview fails, the command reports the skip and keeps the rest of the snaps
 
 ## Setup
 
-Use Node.js 20 or newer.
+Use Node.js 22 or newer.
 
 ```bash
 npm ci
@@ -68,11 +74,23 @@ Both directories are ignored by Git.
 ## Configuration
 
 `engineer-profile.config.json` is the checked-in source for scheduled refreshes.
-It sets the GitHub owner, site presentation, repository limit, paths, and privacy controls.
+It sets the GitHub owner, site presentation, repository limit, paths, theme, deploy targets, and privacy controls.
 
 The loader accepts repository limits from 1 through 100.
 It rejects malformed values before network access.
+It rejects unknown theme and deploy adapter names.
 CLI `--config`, `--data`, and `--output` options override file values.
+
+```json
+{
+  "owner": "your-name",
+  "theme": "paper",
+  "deploy": {
+    "adapter": "github-pages",
+    "siteUrl": "https://your-name.github.io/portfolio"
+  }
+}
+```
 
 Run a network-backed refresh with the checked-in settings:
 
@@ -94,6 +112,51 @@ npm run refresh
 Do not put a token in repository files.
 Use `.env.example` as a variable reference.
 
+## Themes
+
+Each theme changes the palette and light mode of the published site.
+Set `theme` in the configuration file.
+The default theme is `midnight`.
+
+| Theme | Result |
+| --- | --- |
+| `midnight` | Dark blue technical layout. |
+| `paper` | Light editorial layout. |
+| `terminal` | Green-on-black monospace layout. |
+
+Publish with a different theme:
+
+```bash
+npm run publish -- --config engineer-profile.config.json
+```
+
+Change `theme` to `paper` or `terminal`, then run the command again.
+Themes apply to `index.html` and all copied screenshots.
+Unknown theme names fail validation before publishing.
+
+## Deployment
+
+The `deploy` command prepares the published site for one static host.
+It writes the platform file into `output/`.
+It does not push or upload anything.
+
+| Adapter | Files written | Result |
+| --- | --- | --- |
+| `github-pages` | `.nojekyll`, optional `CNAME` | Disable Jekyll and set the custom domain. |
+| `netlify` | `netlify.toml` | Set publish directory and screenshot caching. |
+| `vercel` | `vercel.json` | Set clean URLs and screenshot caching. |
+
+Set the adapter in the configuration file, or pass `--adapter`.
+Run `deploy` after `publish` or `refresh`.
+
+```bash
+npm run deploy -- --adapter netlify
+```
+
+Pass `--site-url` to set a custom domain for GitHub Pages.
+Deploy adapters create local files only.
+Push the output directory with your chosen host's own tooling.
+
 ## Sample output
 
 The fixture set contains `signal-router` and `metrics-kit`.
@@ -112,6 +175,16 @@ Open output/index.html in a browser.
 The site shows project facts, source links, changelog previews, and screenshots.
 The totals come from fixture fields and stored commit records.
 
+A deployment prepares the same snapshot for a host:
+
+```text
+Prepared Netlify deployment in output.
+Wrote output/netlify.toml.
+Next steps:
+  Link the output directory as the publish directory in Netlify.
+  Deploy with the Netlify CLI or a connected repository.
+```
+
 ## Commands
 
 Build before direct CLI commands.
@@ -124,6 +197,7 @@ Build before direct CLI commands.
 | `npm run capture -- --fixture` | Capture local fixture pages. |
 | `npm run publish` | Rebuild the site from SQLite. |
 | `npm run refresh` | Run configured ingest, capture, and publish stages. |
+| `npm run deploy -- --adapter netlify` | Prepare the site for a static host. |
 | `node dist/index.js status` | Show visibility and recent operations. |
 | `npm test` | Run deterministic unit and integration tests. |
 | `npm run typecheck` | Validate TypeScript types. |
@@ -168,6 +242,8 @@ The test suite covers these core behaviors:
 - Release-first changelog generation.
 - SQLite upserts and changelog replacement.
 - Privacy filtering and email redaction.
+- Theme registry selection and theme-aware publishing.
+- Deployment adapter file generation and validation.
 - Fixture ingestion and static publishing.
 - Configured refresh orchestration.
 - Release source links.
@@ -184,7 +260,7 @@ npm test
 
 ### Validation status
 
-Typecheck and build pass locally.
+Typecheck and build pass locally on Node 22.
 CI runs the complete test suite on Ubuntu with Chromium installed.
 The fixture pipeline provides deterministic data for repeatable checks.
 
@@ -196,6 +272,8 @@ The fixture pipeline provides deterministic data for repeatable checks.
 - Changelog quality depends on releases or conventional commits.
 - External pages can fail during capture.
 - Capture failures are reported and do not stop publishing.
+- Themes change local styling only. They cannot change site structure.
+- Deploy adapters write local files. They do not upload them.
 - Publishing creates local files. It does not deploy them.
 - Scheduled runs upload artifacts. They do not commit generated output.
 
@@ -205,8 +283,9 @@ The fixture pipeline provides deterministic data for repeatable checks.
 | --- | --- | --- |
 | v0.1 | Complete | Fixture demo, GitHub ingest, changelog, capture, publish, and privacy controls. |
 | v0.2 | Complete | Checked-in configuration, coordinated refresh command, and scheduled artifact workflow. |
-| v0.3 | Next | Custom themes and deployment adapters. |
-| v0.4 | Later | Commit-diff summaries and an RSS feed. |
+| v0.3 | Complete | Custom themes and deployment adapters for GitHub Pages, Netlify, and Vercel. |
+| v0.4 | Next | Commit-diff summaries and an RSS feed. |
+| v0.5 | Later | Publishing to branches from the scheduled workflow. |
 
 ## License
 
