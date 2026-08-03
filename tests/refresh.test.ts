@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { loadAllFixtures } from "../src/fixtures/loader.js";
 import { refreshPortfolio } from "../src/refresh/run.js";
@@ -33,6 +33,27 @@ describe("configured refresh", () => {
     expect(result.captureErrors).toEqual([]);
     expect(result.published.projectCount).toBe(2);
     expect(result.copiedScreenshots).toBe(0);
+    expect(result.deployment.adapter).toBe("none");
     expect(existsSync(join(TEST_OUTPUT, "index.html"))).toBe(true);
+  });
+
+  it("writes deployment metadata for a configured adapter", async () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      dataDir: TEST_DATA,
+      outputDir: TEST_OUTPUT,
+      repositoryLimit: 2,
+      deploy: { adapter: "gh-pages", domain: "docs.example.dev" },
+      clock: () => "2026-07-31T00:00:00.000Z",
+    };
+
+    const result = await refreshPortfolio(config, {
+      fixtureRepos: loadAllFixtures(),
+      capture: false,
+    });
+
+    expect(result.deployment.adapter).toBe("gh-pages");
+    expect(existsSync(join(TEST_OUTPUT, ".nojekyll"))).toBe(true);
+    expect(readFileSync(join(TEST_OUTPUT, "CNAME"), "utf-8").trim()).toBe("docs.example.dev");
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "engineer-profile",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Self-maintaining engineering portfolio from repository activity",
   "type": "module",
   "main": "dist/index.js",
@@ -18,10 +18,11 @@
     "ingest": "npm run build && node dist/index.js ingest",
     "publish": "npm run build && node dist/index.js publish",
     "capture": "npm run build && node dist/index.js capture",
+    "deploy": "npm run build && node dist/index.js deploy",
     "refresh": "npm run build && node dist/index.js refresh"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "keywords": [
     "portfolio",
@@ -40,7 +41,7 @@
   },
   "homepage": "https://github.com/DanielCuevas1208/engineer-profile#readme",
   "dependencies": {
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^13.0.2",
     "commander": "^15.0.0"
   },
   "devDependencies": {

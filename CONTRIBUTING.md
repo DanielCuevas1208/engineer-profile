@@ -2,7 +2,7 @@
 
 ## Local checks
 
-Use Node.js 20 or newer.
+Use Node.js 22 or newer.
 
 ```bash
 npm ci
@@ -20,3 +20,10 @@ Do not add credentials, private repository data, or generated output.
 Explain the user value and the data path.
 List the checks that you ran.
 Keep public claims tied to repository evidence.
+
+## Release checklist
+
+Bump the version in `package.json`.
+Run the demo to confirm the fixture pipeline.
+Run all checks from the local checklist.
+Update the roadmap in the README.
