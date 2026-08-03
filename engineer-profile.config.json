@@ -3,6 +3,10 @@
   "title": "EngineerProfile",
   "tagline": "A living index of shipped systems, maintained from repository evidence",
   "repositoryLimit": 5,
+  "theme": "aurora",
+  "deploy": {
+    "adapter": "none"
+  },
   "dataDir": "data",
   "outputDir": "output",
   "privacy": {

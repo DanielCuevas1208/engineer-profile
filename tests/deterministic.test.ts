@@ -35,6 +35,8 @@ describe("deterministic publishing", () => {
 
     expect(html[0]).toBe(html[1]);
     expect(html[0]).toContain("2026-07-31 00:00:00 UTC");
+    expect(html[0]).toContain('data-theme="aurora"');
+    expect(html[0]).toContain("--accent: #67b7ff;");
   });
 
   it("keeps release source links in the published evidence trail", async () => {

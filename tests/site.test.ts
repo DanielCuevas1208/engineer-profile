@@ -87,6 +87,25 @@ describe("database and publish pipeline", () => {
     expect(html).toContain("total stars");
   });
 
+  it("publishes with the default theme markers", async () => {
+    const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT };
+    await ingestRepository(
+      config,
+      { owner: "demo-engineer", repo: "signal-router" },
+      {
+        repo: loadFixtureRepo("signal-router"),
+        commits: loadFixtureCommits("signal-router"),
+        releases: loadFixtureReleases("signal-router"),
+      }
+    );
+
+    const result = publishSite(config);
+    expect(result.theme).toBe("aurora");
+    const html = readFileSync(result.indexPath, "utf-8");
+    expect(html).toContain('data-theme="aurora"');
+    expect(html).toContain("--accent: #67b7ff;");
+  });
+
   it("respects visibility when publishing", async () => {
     const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT };
     await ingestRepository(

@@ -1,9 +1,13 @@
 {
   "name": "engineer-profile",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Self-maintaining engineering portfolio from repository activity",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "bin": {
     "engineer-profile": "dist/index.js"
   },
@@ -18,6 +22,7 @@
     "ingest": "npm run build && node dist/index.js ingest",
     "publish": "npm run build && node dist/index.js publish",
     "capture": "npm run build && node dist/index.js capture",
+    "deploy": "npm run build && node dist/index.js deploy",
     "refresh": "npm run build && node dist/index.js refresh"
   },
   "engines": {

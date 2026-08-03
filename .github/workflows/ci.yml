@@ -44,6 +44,11 @@ jobs:
       - name: Run fixture demo
         run: node dist/index.js demo
 
+      - name: Exercise deployment adapter
+        run: |
+          node dist/index.js deploy --data data --output output --target "$RUNNER_TEMP/deploy-target"
+          test -f "$RUNNER_TEMP/deploy-target/index.html"
+
       - name: Store demo output
         if: success()
         uses: actions/upload-artifact@v4

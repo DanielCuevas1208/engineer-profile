@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "17 5 * * 1"
   workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: Local deploy target directory (optional)
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -42,3 +48,16 @@ jobs:
           name: engineer-profile-refresh
           path: output/
           if-no-files-found: error
+
+      - name: Deploy to requested target
+        if: inputs.deploy_target != ''
+        run: |
+          node dist/index.js deploy --data data --output output --target "${{ inputs.deploy_target }}"
+          test -d "${{ inputs.deploy_target }}"
+
+      - name: Store deployed target
+        if: inputs.deploy_target != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineer-profile-deploy
+          path: ${{ inputs.deploy_target }}
