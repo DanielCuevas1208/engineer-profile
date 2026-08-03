@@ -2,9 +2,14 @@
   "owner": "DanielCuevas1208",
   "title": "EngineerProfile",
   "tagline": "A living index of shipped systems, maintained from repository evidence",
+  "theme": "dark",
   "repositoryLimit": 5,
   "dataDir": "data",
   "outputDir": "output",
+  "deploy": {
+    "adapter": "gh-pages",
+    "domain": "danielcuevas1208.github.io"
+  },
   "privacy": {
     "hiddenProjects": [],
     "redactEmails": true,

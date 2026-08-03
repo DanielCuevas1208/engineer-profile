@@ -5,6 +5,8 @@ import { Command } from "commander";
 import { ingestOwnerRepos, ingestRepository } from "./ingest/orchestrator.js";
 import { captureAllProjects, captureLocalHtml, closeBrowser } from "./preview/capture.js";
 import { copyScreenshotsToOutput, publishSite } from "./publish/site.js";
+import { applyDeployAdapter, listDeployAdapters } from "./deploy/index.js";
+import { listThemes } from "./theme/index.js";
 import { loadAllFixtures } from "./fixtures/loader.js";
 import { openDatabase } from "./db/client.js";
 import { DEFAULT_CONFIG, type PortfolioConfig } from "./types.js";
@@ -16,7 +18,7 @@ const program = new Command();
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.2.0");
+  .version("0.3.0");
 
 function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
   const base = options.config
@@ -65,8 +67,10 @@ addConfigOption(program
 
     const result = publishSite(config);
     const copied = copyScreenshotsToOutput(config);
+    const deploy = applyDeployAdapter(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Prepared deployment for ${deploy.adapter}${deploy.domain ? ` (${deploy.domain})` : ""}.`);
     console.log("Open output/index.html in a browser.");
   }));
 
@@ -129,8 +133,10 @@ addConfigOption(program
     const config = resolveConfig(options);
     const result = publishSite(config);
     const copied = copyScreenshotsToOutput(config);
+    const deploy = applyDeployAdapter(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Prepared deployment for ${deploy.adapter}${deploy.domain ? ` (${deploy.domain})` : ""}.`);
   }));
 
 addConfigOption(program
@@ -146,6 +152,7 @@ addConfigOption(program
     console.log(`Captured ${result.captured} project previews.`);
     console.log(`Published ${result.published.projectCount} projects to ${result.published.indexPath}.`);
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+    console.log(`Prepared deployment for ${result.deployment.adapter}${result.deployment.domain ? ` (${result.deployment.domain})` : ""}.`);
     for (const error of result.captureErrors) {
       console.warn(`Skipped ${error.slug}: ${error.message}`);
     }
@@ -197,6 +204,44 @@ addConfigOption(program
       }
     } finally {
       db.close();
+    }
+  }));
+
+program
+  .command("theme")
+  .description("List available site themes")
+  .action(() => {
+    for (const theme of listThemes()) {
+      console.log(`${theme.name} - ${theme.label}`);
+    }
+  });
+
+addConfigOption(program
+  .command("deploy")
+  .description("Write deployment metadata for the configured adapter")
+  .option("-a, --adapter <name>", "Deployment adapter")
+  .option("--domain <domain>", "Custom domain for the adapter")
+  .option("--list", "List available adapters")
+  .option("-d, --data <dir>", "Data directory")
+  .option("-o, --output <dir>", "Output directory")
+  .action((options) => {
+    if (options.list) {
+      for (const adapter of listDeployAdapters()) {
+        console.log(`${adapter.name} - ${adapter.label}`);
+      }
+      return;
+    }
+    const config = resolveConfig(options);
+    const result = applyDeployAdapter(config, options.adapter, options.domain);
+    console.log(`Prepared deployment for ${result.adapter}${result.domain ? ` (${result.domain})` : ""}.`);
+    if (result.files.length === 0) {
+      console.log("No metadata files were required.");
+    }
+    for (const file of result.files) {
+      console.log(`  Wrote ${file}.`);
+    }
+    if (result.adapter === "surge" && !result.domain) {
+      console.log("Surge needs a domain. Set deploy.domain or pass --domain.");
     }
   }));
 

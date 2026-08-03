@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
-import type { PortfolioConfig, PrivacyConfig } from "../types.js";
-import { DEFAULT_CONFIG, DEFAULT_PRIVACY } from "../types.js";
+import type { DeployConfig, PortfolioConfig, PrivacyConfig } from "../types.js";
+import { DEFAULT_CONFIG, DEFAULT_DEPLOY, DEFAULT_PRIVACY, DEFAULT_THEME } from "../types.js";
 import { mergePrivacy } from "../privacy/controls.js";
+import { listThemes } from "../theme/index.js";
+import { listDeployAdapters } from "../deploy/index.js";
 
 export const DEFAULT_CONFIG_PATH = "engineer-profile.config.json";
 
@@ -56,6 +58,40 @@ function readPrivacy(source: ConfigValue): PrivacyConfig {
   });
 }
 
+function readTheme(source: ConfigValue): string {
+  if (!("theme" in source)) return DEFAULT_THEME;
+  const value = source.theme;
+  if (typeof value !== "string" || !listThemes().some((theme) => theme.name === value)) {
+    const names = listThemes().map((theme) => theme.name).join(", ");
+    throw new Error(`Configuration field "theme" must be one of: ${names}.`);
+  }
+  return value;
+}
+
+function readDeploy(source: ConfigValue): DeployConfig {
+  if (!("deploy" in source)) return DEFAULT_DEPLOY;
+  if (!isConfigValue(source.deploy)) {
+    throw new Error('Configuration field "deploy" must be an object.');
+  }
+
+  const adapter = "adapter" in source.deploy ? source.deploy.adapter : DEFAULT_DEPLOY.adapter;
+  if (typeof adapter !== "string" || !listDeployAdapters().some((candidate) => candidate.name === adapter)) {
+    const names = listDeployAdapters().map((candidate) => candidate.name).join(", ");
+    throw new Error(`Configuration field "deploy.adapter" must be one of: ${names}.`);
+  }
+
+  let domain: string | undefined;
+  if ("domain" in source.deploy) {
+    const value = source.deploy.domain;
+    if (typeof value !== "string" || value.trim() === "") {
+      throw new Error('Configuration field "deploy.domain" must be a non-empty string.');
+    }
+    domain = value.trim();
+  }
+
+  return { adapter, domain };
+}
+
 export function loadPortfolioConfig(
   path: string = DEFAULT_CONFIG_PATH,
   clock: () => string = DEFAULT_CONFIG.clock
@@ -75,10 +111,12 @@ export function loadPortfolioConfig(
     owner: readString(parsed, "owner", DEFAULT_CONFIG.owner),
     title: readString(parsed, "title", DEFAULT_CONFIG.title),
     tagline: readString(parsed, "tagline", DEFAULT_CONFIG.tagline),
+    theme: readTheme(parsed),
     repositoryLimit: readLimit(parsed, "repositoryLimit", DEFAULT_CONFIG.repositoryLimit),
     dataDir: readString(parsed, "dataDir", DEFAULT_CONFIG.dataDir),
     outputDir: readString(parsed, "outputDir", DEFAULT_CONFIG.outputDir),
     privacy: readPrivacy(parsed),
+    deploy: readDeploy(parsed),
     clock,
   };
 }

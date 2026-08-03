@@ -87,6 +87,24 @@ describe("database and publish pipeline", () => {
     expect(html).toContain("total stars");
   });
 
+  it("renders the configured theme into the published page", async () => {
+    const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT, theme: "light" };
+    await ingestRepository(
+      config,
+      { owner: "demo-engineer", repo: "signal-router" },
+      {
+        repo: loadFixtureRepo("signal-router"),
+        commits: loadFixtureCommits("signal-router"),
+        releases: loadFixtureReleases("signal-router"),
+      }
+    );
+
+    publishSite(config);
+    const html = readFileSync(join(TEST_OUTPUT, "index.html"), "utf-8");
+    expect(html).toContain("color-scheme: light");
+    expect(html).not.toContain("color-scheme: dark");
+  });
+
   it("respects visibility when publishing", async () => {
     const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT };
     await ingestRepository(

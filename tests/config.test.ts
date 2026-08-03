@@ -15,6 +15,8 @@ describe("portfolio configuration", () => {
       owner: "owner",
       title: "Evidence Index",
       repositoryLimit: 3,
+      theme: "light",
+      deploy: { adapter: "vercel" },
       privacy: { hiddenProjects: ["owner-hidden"], redactEmails: false },
     }));
 
@@ -23,6 +25,9 @@ describe("portfolio configuration", () => {
     expect(config.owner).toBe("owner");
     expect(config.title).toBe("Evidence Index");
     expect(config.repositoryLimit).toBe(3);
+    expect(config.theme).toBe("light");
+    expect(config.deploy.adapter).toBe("vercel");
+    expect(config.deploy.domain).toBeUndefined();
     expect(config.privacy.hiddenProjects).toEqual(["owner-hidden"]);
     expect(config.privacy.redactEmails).toBe(false);
     expect(config.privacy.maxCommitsPerProject).toBe(50);
@@ -35,6 +40,37 @@ describe("portfolio configuration", () => {
 
     expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
       'Configuration field "repositoryLimit" must be an integer from 1 to 100.'
+    );
+  });
+
+  it("rejects unknown theme names", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({ theme: "rainbow" }));
+
+    expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
+      'Configuration field "theme" must be one of:'
+    );
+  });
+
+  it("rejects unknown deploy adapters", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({ deploy: { adapter: "ftp" } }));
+
+    expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
+      'Configuration field "deploy.adapter" must be one of:'
+    );
+  });
+
+  it("accepts a deploy domain and rejects empty domains", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({
+      deploy: { adapter: "gh-pages", domain: "docs.example.dev" },
+    }));
+    expect(loadPortfolioConfig(TEST_FILE).deploy.domain).toBe("docs.example.dev");
+
+    writeFileSync(TEST_FILE, JSON.stringify({ deploy: { adapter: "gh-pages", domain: "  " } }));
+    expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
+      'Configuration field "deploy.domain" must be a non-empty string.'
     );
   });
 });

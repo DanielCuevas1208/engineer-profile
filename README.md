@@ -11,6 +11,8 @@ paths in SQLite. It publishes a static site from these records.
 - Build release notes from releases or conventional commits.
 - Capture repeatable project previews with Playwright.
 - Hide projects and redact author emails before publication.
+- Select a built-in theme for the published page.
+- Stamp deployment metadata for a chosen host.
 - Run one configured refresh from a scheduled workflow.
 
 The fixture demo runs without secrets and without network access.
@@ -30,20 +32,24 @@ flowchart LR
   L --> W[Publisher]
   P --> W
   S --> W
+  T[Theme] --> W
   W --> O[Static output]
+  O --> A[Deploy adapter]
 ```
 
 | Area | Responsibility |
 | --- | --- |
-| `engineer-profile.config.json` | Store owner, presentation, refresh, paths, and privacy settings. |
+| `engineer-profile.config.json` | Store owner, theme, deploy, paths, and privacy settings. |
 | `src/config/` | Validate checked-in JSON and merge safe defaults. |
-| `src/refresh/` | Coordinate ingest, best-effort capture, and static publishing. |
+| `src/refresh/` | Coordinate ingest, best-effort capture, static publishing, and deploy. |
 | `src/ingest/` | Fetch public GitHub data and map it to records. |
 | `src/db/` | Store projects, commits, changelogs, and audit events. |
 | `src/changelog/` | Prefer release notes and fall back to commit groups. |
 | `src/privacy/` | Hide projects and block sensitive commit messages. |
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
+| `src/theme/` | Resolve named palettes into CSS custom properties. |
 | `src/publish/` | Render HTML, changelog files, and preview assets. |
+| `src/deploy/` | Write host metadata into the static output. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
 The refresh command runs each stage in a fixed order.
@@ -51,7 +57,7 @@ If a preview fails, the command reports the skip and keeps the rest of the snaps
 
 ## Setup
 
-Use Node.js 20 or newer.
+Use Node.js 22 or newer.
 
 ```bash
 npm ci
@@ -68,10 +74,11 @@ Both directories are ignored by Git.
 ## Configuration
 
 `engineer-profile.config.json` is the checked-in source for scheduled refreshes.
-It sets the GitHub owner, site presentation, repository limit, paths, and privacy controls.
+It sets the GitHub owner, site theme, deployment adapter, paths, and privacy controls.
 
 The loader accepts repository limits from 1 through 100.
 It rejects malformed values before network access.
+The loader rejects unknown theme names and unknown deployment adapters.
 CLI `--config`, `--data`, and `--output` options override file values.
 
 Run a network-backed refresh with the checked-in settings:
@@ -82,6 +89,34 @@ npm run refresh
 
 The refresh command reads public repositories, captures previews, publishes HTML,
 and reports skipped captures.
+
+### Themes
+
+Each theme stores a named palette of CSS custom properties.
+The publisher injects the palette into the page.
+
+Built-in themes: `dark`, `light`, and `paper`.
+
+List the themes with `node dist/index.js theme`.
+Switch themes by editing the `theme` field, then run `npm run publish`.
+
+### Deployment adapters
+
+An adapter writes host-specific metadata into `output/`.
+
+| Adapter | Metadata |
+| --- | --- |
+| `gh-pages` | `.nojekyll`, plus `CNAME` when a domain is set. |
+| `vercel` | `vercel.json` with clean URLs and screenshot caching. |
+| `netlify` | `netlify.toml` with static publishing and screenshot caching. |
+| `surge` | `CNAME` with the configured domain. |
+| `none` | No metadata files. |
+
+Set the adapter in the `deploy` field.
+Set the optional `deploy.domain` field for custom domains.
+Adapters write local files. They do not upload anything.
+List adapters with `node dist/index.js deploy --list`.
+Apply the configured adapter with `node dist/index.js deploy`.
 
 GitHub ingestion uses the public API.
 Set `GITHUB_TOKEN` for a higher rate limit.
@@ -106,6 +141,7 @@ Captured demo-engineer-signal-router.
 Captured demo-engineer-metrics-kit.
 Published 2 projects to output/index.html.
 Copied 2 available preview screenshots.
+Prepared deployment for gh-pages (danielcuevas1208.github.io).
 Open output/index.html in a browser.
 ```
 
@@ -122,9 +158,12 @@ Build before direct CLI commands.
 | `npm run ingest -- octocat --limit 3` | Load public repository evidence. |
 | `npm run ingest -- --fixture` | Load fixture records only. |
 | `npm run capture -- --fixture` | Capture local fixture pages. |
-| `npm run publish` | Rebuild the site from SQLite. |
-| `npm run refresh` | Run configured ingest, capture, and publish stages. |
+| `npm run publish` | Rebuild the site and deployment metadata from SQLite. |
+| `npm run refresh` | Run configured ingest, capture, publish, and deploy stages. |
 | `node dist/index.js status` | Show visibility and recent operations. |
+| `node dist/index.js theme` | List available site themes. |
+| `node dist/index.js deploy` | Apply the configured deployment adapter. |
+| `node dist/index.js deploy --list` | List available deployment adapters. |
 | `npm test` | Run deterministic unit and integration tests. |
 | `npm run typecheck` | Validate TypeScript types. |
 | `npm run build` | Compile the CLI to `dist/`. |
@@ -172,6 +211,8 @@ The test suite covers these core behaviors:
 - Configured refresh orchestration.
 - Release source links.
 - Deterministic HTML output.
+- Theme resolution and token rendering.
+- Deployment adapter output files.
 - Playwright screenshot capture.
 
 Run the local checks:
@@ -186,6 +227,7 @@ npm test
 
 Typecheck and build pass locally.
 CI runs the complete test suite on Ubuntu with Chromium installed.
+CI uses Node.js 22 LTS.
 The fixture pipeline provides deterministic data for repeatable checks.
 
 ## Limitations
@@ -197,6 +239,7 @@ The fixture pipeline provides deterministic data for repeatable checks.
 - External pages can fail during capture.
 - Capture failures are reported and do not stop publishing.
 - Publishing creates local files. It does not deploy them.
+- Deployment adapters write local metadata. They do not upload anything.
 - Scheduled runs upload artifacts. They do not commit generated output.
 
 ## Roadmap
@@ -205,8 +248,9 @@ The fixture pipeline provides deterministic data for repeatable checks.
 | --- | --- | --- |
 | v0.1 | Complete | Fixture demo, GitHub ingest, changelog, capture, publish, and privacy controls. |
 | v0.2 | Complete | Checked-in configuration, coordinated refresh command, and scheduled artifact workflow. |
-| v0.3 | Next | Custom themes and deployment adapters. |
-| v0.4 | Later | Commit-diff summaries and an RSS feed. |
+| v0.3 | Complete | Built-in themes and deployment adapters. |
+| v0.4 | Next | Commit-diff summaries and an RSS feed. |
+| v0.5 | Later | Portfolio search and topic filters. |
 
 ## License
 
