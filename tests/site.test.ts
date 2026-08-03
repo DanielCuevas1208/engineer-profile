@@ -127,4 +127,26 @@ describe("database and publish pipeline", () => {
     const md = readFileSync(changelogPath, "utf-8");
     expect(md).toContain("v0.3.0");
   });
+
+  it("publishes evidence pages and a changelog feed", async () => {
+    const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT };
+    await ingestRepository(
+      config,
+      { owner: "demo-engineer", repo: "signal-router" },
+      {
+        repo: loadFixtureRepo("signal-router"),
+        commits: loadFixtureCommits("signal-router"),
+        releases: loadFixtureReleases("signal-router"),
+      }
+    );
+
+    const result = publishSite(config);
+    expect(result.evidencePages).toBe(1);
+    expect(result.feedPath).toMatch(/feed\.xml$/);
+    expect(existsSync(join(TEST_OUTPUT, "demo-engineer-signal-router", "index.html"))).toBe(true);
+    expect(existsSync(join(TEST_OUTPUT, "feed.xml"))).toBe(true);
+    expect(readFileSync(join(TEST_OUTPUT, "feed.xml"), "utf-8")).toContain(
+      "signal-router: Priority queues"
+    );
+  });
 });

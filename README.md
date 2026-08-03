@@ -10,6 +10,8 @@ paths in SQLite. It publishes a static site from these records.
 - Refresh project cards from public GitHub repositories.
 - Build release notes from releases or conventional commits.
 - Capture repeatable project previews with Playwright.
+- Publish one evidence page per project with its full changelog.
+- Expose changelog updates as an RSS feed.
 - Hide projects and redact author emails before publication.
 - Run one configured refresh from a scheduled workflow.
 
@@ -31,6 +33,8 @@ flowchart LR
   P --> W
   S --> W
   W --> O[Static output]
+  L --> E[Evidence pages]
+  L --> X[RSS feed]
 ```
 
 | Area | Responsibility |
@@ -43,15 +47,18 @@ flowchart LR
 | `src/changelog/` | Prefer release notes and fall back to commit groups. |
 | `src/privacy/` | Hide projects and block sensitive commit messages. |
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
-| `src/publish/` | Render HTML, changelog files, and preview assets. |
+| `src/publish/` | Render the index, evidence pages, RSS feed, and preview assets. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
 The refresh command runs each stage in a fixed order.
 If a preview fails, the command reports the skip and keeps the rest of the snapshot.
+The publisher writes one page per visible project and one changelog feed.
+Evidence pages keep the full changelog with source links.
+The feed lists the latest changelog entry for each project.
 
 ## Setup
 
-Use Node.js 20 or newer.
+Use Node.js 22 or newer.
 
 ```bash
 npm ci
@@ -106,11 +113,28 @@ Captured demo-engineer-signal-router.
 Captured demo-engineer-metrics-kit.
 Published 2 projects to output/index.html.
 Copied 2 available preview screenshots.
+Wrote 2 evidence pages and output/feed.xml.
 Open output/index.html in a browser.
 ```
 
 The site shows project facts, source links, changelog previews, and screenshots.
+Each card links to a dedicated evidence page.
+The evidence page shows the full changelog with source links.
+The feed lists the latest changelog entry for each project.
 The totals come from fixture fields and stored commit records.
+
+## Evidence pages and feed
+
+The publisher writes these extra files to the output directory:
+
+- One `feed.xml` file with the latest changelog entry per visible project.
+- One `output/<slug>/index.html` page per visible project.
+
+Evidence pages show repository facts, topics, and the full changelog.
+Each changelog entry keeps its source link and publish date.
+The feed sorts entries newest first.
+Feed links point to repository URLs.
+They never point to an invented deployment host.
 
 ## Commands
 
@@ -122,7 +146,7 @@ Build before direct CLI commands.
 | `npm run ingest -- octocat --limit 3` | Load public repository evidence. |
 | `npm run ingest -- --fixture` | Load fixture records only. |
 | `npm run capture -- --fixture` | Capture local fixture pages. |
-| `npm run publish` | Rebuild the site from SQLite. |
+| `npm run publish` | Rebuild the site, evidence pages, and feed from SQLite. |
 | `npm run refresh` | Run configured ingest, capture, and publish stages. |
 | `node dist/index.js status` | Show visibility and recent operations. |
 | `npm test` | Run deterministic unit and integration tests. |
@@ -153,6 +177,7 @@ Each release keeps its tag, notes, date, and source URL.
 The site displays visible projects only.
 It links project cards to repositories.
 It links release notes to their release pages.
+It links each card to its local evidence page.
 It records local operations in an audit table.
 
 ## CI and test status
@@ -172,6 +197,7 @@ The test suite covers these core behaviors:
 - Configured refresh orchestration.
 - Release source links.
 - Deterministic HTML output.
+- Evidence pages and the RSS feed.
 - Playwright screenshot capture.
 
 Run the local checks:
@@ -186,6 +212,7 @@ npm test
 
 Typecheck and build pass locally.
 CI runs the complete test suite on Ubuntu with Chromium installed.
+CI uses Node.js 22.
 The fixture pipeline provides deterministic data for repeatable checks.
 
 ## Limitations
@@ -196,6 +223,7 @@ The fixture pipeline provides deterministic data for repeatable checks.
 - Changelog quality depends on releases or conventional commits.
 - External pages can fail during capture.
 - Capture failures are reported and do not stop publishing.
+- Feed links point to repository URLs, not to a deployed host.
 - Publishing creates local files. It does not deploy them.
 - Scheduled runs upload artifacts. They do not commit generated output.
 
@@ -205,8 +233,9 @@ The fixture pipeline provides deterministic data for repeatable checks.
 | --- | --- | --- |
 | v0.1 | Complete | Fixture demo, GitHub ingest, changelog, capture, publish, and privacy controls. |
 | v0.2 | Complete | Checked-in configuration, coordinated refresh command, and scheduled artifact workflow. |
-| v0.3 | Next | Custom themes and deployment adapters. |
-| v0.4 | Later | Commit-diff summaries and an RSS feed. |
+| v0.3 | Complete | Evidence pages, RSS changelog feed, and the Node 22 toolchain. |
+| v0.4 | Next | Custom themes and deployment adapters. |
+| v0.5 | Later | Commit-diff summaries. |
 
 ## License
 

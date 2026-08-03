@@ -16,7 +16,7 @@ const program = new Command();
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.2.0");
+  .version("0.3.0");
 
 function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
   const base = options.config
@@ -67,6 +67,7 @@ addConfigOption(program
     const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Wrote ${result.evidencePages} evidence pages and ${result.feedPath}.`);
     console.log("Open output/index.html in a browser.");
   }));
 
@@ -131,6 +132,7 @@ addConfigOption(program
     const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Wrote ${result.evidencePages} evidence pages and ${result.feedPath}.`);
   }));
 
 addConfigOption(program
@@ -145,6 +147,7 @@ addConfigOption(program
     console.log(`Ingested ${result.ingested} repositories for ${config.owner}.`);
     console.log(`Captured ${result.captured} project previews.`);
     console.log(`Published ${result.published.projectCount} projects to ${result.published.indexPath}.`);
+    console.log(`Wrote ${result.published.evidencePages} evidence pages and ${result.published.feedPath}.`);
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
     for (const error of result.captureErrors) {
       console.warn(`Skipped ${error.slug}: ${error.message}`);
