@@ -3,6 +3,9 @@ dist/
 coverage/
 data/
 output/
+deployment/
+site/
+.deploy-check/
 *.db
 *.db-journal
 *.db-shm

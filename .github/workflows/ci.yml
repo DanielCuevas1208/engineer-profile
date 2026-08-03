@@ -23,7 +23,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Install dependencies
@@ -43,6 +43,15 @@ jobs:
 
       - name: Run fixture demo
         run: node dist/index.js demo
+
+      - name: Publish demo with each theme
+        run: |
+          node dist/index.js publish --theme aurora
+          node dist/index.js publish --theme terminal
+          node dist/index.js publish --theme paper
+
+      - name: Deploy demo output locally
+        run: node dist/index.js deploy --adapter local --target deployment/preview
 
       - name: Store demo output
         if: success()

@@ -5,6 +5,10 @@
   "repositoryLimit": 5,
   "dataDir": "data",
   "outputDir": "output",
+  "theme": "aurora",
+  "deploy": {
+    "adapter": "none"
+  },
   "privacy": {
     "hiddenProjects": [],
     "redactEmails": true,

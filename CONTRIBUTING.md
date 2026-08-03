@@ -2,7 +2,7 @@
 
 ## Local checks
 
-Use Node.js 20 or newer.
+Use Node.js 22.12 or newer.
 
 ```bash
 npm ci
@@ -14,6 +14,13 @@ npm test
 
 Use fixtures for changes that need repeatable data.
 Do not add credentials, private repository data, or generated output.
+
+Run the fixture demo to verify the whole pipeline:
+
+```bash
+npm run demo
+npm run deploy -- --adapter local --target .deploy-check
+```
 
 ## Pull requests
 

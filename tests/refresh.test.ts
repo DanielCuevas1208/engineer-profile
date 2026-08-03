@@ -7,10 +7,12 @@ import { DEFAULT_CONFIG } from "../src/types.js";
 
 const TEST_DATA = join("data", "test-refresh");
 const TEST_OUTPUT = join("output", "test-refresh");
+const TEST_TARGET = join("output", "test-refresh-target");
 
 afterEach(() => {
   rmSync(TEST_DATA, { recursive: true, force: true });
   rmSync(TEST_OUTPUT, { recursive: true, force: true });
+  rmSync(TEST_TARGET, { recursive: true, force: true });
 });
 
 describe("configured refresh", () => {
@@ -33,6 +35,27 @@ describe("configured refresh", () => {
     expect(result.captureErrors).toEqual([]);
     expect(result.published.projectCount).toBe(2);
     expect(result.copiedScreenshots).toBe(0);
+    expect(result.deployed).toBeNull();
     expect(existsSync(join(TEST_OUTPUT, "index.html"))).toBe(true);
+  });
+
+  it("deploys the snapshot when a local adapter is configured", async () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      dataDir: TEST_DATA,
+      outputDir: TEST_OUTPUT,
+      repositoryLimit: 2,
+      deploy: { adapter: "local", targetDir: TEST_TARGET },
+      clock: () => "2026-07-31T00:00:00.000Z",
+    };
+
+    const result = await refreshPortfolio(config, {
+      fixtureRepos: loadAllFixtures(),
+      capture: false,
+    });
+
+    expect(result.deployed?.adapter).toBe("local");
+    expect(result.deployed?.filesCopied).toBeGreaterThan(0);
+    expect(existsSync(join(TEST_TARGET, "index.html"))).toBe(true);
   });
 });

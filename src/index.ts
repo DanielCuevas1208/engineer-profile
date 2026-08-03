@@ -5,20 +5,22 @@ import { Command } from "commander";
 import { ingestOwnerRepos, ingestRepository } from "./ingest/orchestrator.js";
 import { captureAllProjects, captureLocalHtml, closeBrowser } from "./preview/capture.js";
 import { copyScreenshotsToOutput, publishSite } from "./publish/site.js";
+import { deployPortfolio } from "./deploy/run.js";
 import { loadAllFixtures } from "./fixtures/loader.js";
 import { openDatabase } from "./db/client.js";
 import { DEFAULT_CONFIG, type PortfolioConfig } from "./types.js";
 import { DEFAULT_CONFIG_PATH, loadPortfolioConfig } from "./config/loader.js";
 import { refreshPortfolio } from "./refresh/run.js";
+import { listThemeNames } from "./theme/registry.js";
 
 const program = new Command();
 
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.2.0");
+  .version("0.3.0");
 
-function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
+function resolveConfig(options: { config?: string; data?: string; output?: string; theme?: string }): PortfolioConfig {
   const base = options.config
     ? loadPortfolioConfig(options.config)
     : existsSync(DEFAULT_CONFIG_PATH)
@@ -28,11 +30,14 @@ function resolveConfig(options: { config?: string; data?: string; output?: strin
     ...base,
     dataDir: options.data ?? base.dataDir,
     outputDir: options.output ?? base.outputDir,
+    theme: options.theme ?? base.theme,
   };
 }
 
 function addConfigOption(command: Command): Command {
-  return command.option("-c, --config <file>", "Configuration file");
+  return command
+    .option("-c, --config <file>", "Configuration file")
+    .option("-t, --theme <name>", `Presentation theme (${listThemeNames().join(", ")})`);
 }
 
 addConfigOption(program
@@ -65,7 +70,7 @@ addConfigOption(program
 
     const result = publishSite(config);
     const copied = copyScreenshotsToOutput(config);
-    console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
+    console.log(`Published ${result.projectCount} projects (theme: ${result.theme}) to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
     console.log("Open output/index.html in a browser.");
   }));
@@ -129,25 +134,49 @@ addConfigOption(program
     const config = resolveConfig(options);
     const result = publishSite(config);
     const copied = copyScreenshotsToOutput(config);
-    console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
+    console.log(`Published ${result.projectCount} projects (theme: ${result.theme}) to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
   }));
 
 addConfigOption(program
   .command("refresh")
-  .description("Ingest, capture, and publish from the checked-in configuration")
+  .description("Ingest, capture, publish, and optionally deploy from the checked-in configuration")
   .option("-d, --data <dir>", "Data directory")
   .option("-o, --output <dir>", "Output directory")
+  .option("--target <dir>", "Local deployment target directory")
   .action(async (options) => {
     const config = resolveConfig(options);
     mkdirSync(config.dataDir, { recursive: true });
-    const result = await refreshPortfolio(config);
+    const result = await refreshPortfolio(config, { deployTargetDir: options.target });
     console.log(`Ingested ${result.ingested} repositories for ${config.owner}.`);
     console.log(`Captured ${result.captured} project previews.`);
-    console.log(`Published ${result.published.projectCount} projects to ${result.published.indexPath}.`);
+    console.log(`Published ${result.published.projectCount} projects (theme: ${result.published.theme}) to ${result.published.indexPath}.`);
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+    if (result.deployed?.target) {
+      console.log(`Deployed ${result.deployed.filesCopied} files via ${result.deployed.adapter} to ${result.deployed.target}.`);
+    }
     for (const error of result.captureErrors) {
       console.warn(`Skipped ${error.slug}: ${error.message}`);
+    }
+  }));
+
+addConfigOption(program
+  .command("deploy")
+  .description("Copy the published site to a deployment target")
+  .option("-a, --adapter <name>", "Deployment adapter (none, local)")
+  .option("--target <dir>", "Local deployment target directory")
+  .option("-d, --data <dir>", "Data directory")
+  .option("-o, --output <dir>", "Output directory")
+  .action((options) => {
+    const config = resolveConfig(options);
+    const result = deployPortfolio(config, {
+      adapter: options.adapter,
+      targetDir: options.target,
+    });
+    if (result.target) {
+      console.log(`Deployed ${result.filesCopied} files via ${result.adapter} to ${result.target}.`);
+    } else {
+      console.log(`Deployment adapter "${result.adapter}" did nothing.`);
     }
   }));
 
@@ -200,4 +229,9 @@ addConfigOption(program
     }
   }));
 
-await program.parseAsync();
+try {
+  await program.parseAsync();
+} catch (error) {
+  console.error((error as Error).message);
+  process.exitCode = 1;
+}

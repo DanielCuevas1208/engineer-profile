@@ -78,6 +78,13 @@ export interface PrivacyConfig {
   maxCommitsPerProject: number;
 }
 
+export type DeployAdapterName = "none" | "local";
+
+export interface DeploymentConfig {
+  adapter: DeployAdapterName;
+  targetDir?: string;
+}
+
 export interface PortfolioConfig {
   owner: string;
   title: string;
@@ -85,6 +92,8 @@ export interface PortfolioConfig {
   repositoryLimit?: number;
   dataDir: string;
   outputDir: string;
+  theme: string;
+  deploy: DeploymentConfig;
   privacy: PrivacyConfig;
   clock: () => string;
 }
@@ -95,6 +104,10 @@ export const DEFAULT_PRIVACY: PrivacyConfig = {
   maxCommitsPerProject: 50,
 };
 
+export const DEFAULT_DEPLOY: DeploymentConfig = {
+  adapter: "none",
+};
+
 export const DEFAULT_CONFIG = {
   owner: "demo-engineer",
   title: "EngineerProfile",
@@ -102,6 +115,8 @@ export const DEFAULT_CONFIG = {
   repositoryLimit: 5,
   dataDir: "data",
   outputDir: "output",
+  theme: "aurora",
+  deploy: DEFAULT_DEPLOY,
   privacy: DEFAULT_PRIVACY,
   clock: () => new Date().toISOString(),
 } satisfies PortfolioConfig;

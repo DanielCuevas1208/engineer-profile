@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import type { PortfolioConfig, PrivacyConfig } from "../types.js";
-import { DEFAULT_CONFIG, DEFAULT_PRIVACY } from "../types.js";
+import { DEFAULT_CONFIG, DEFAULT_DEPLOY, DEFAULT_PRIVACY } from "../types.js";
 import { mergePrivacy } from "../privacy/controls.js";
+import { isKnownTheme } from "../theme/registry.js";
+import { isKnownAdapter } from "../deploy/adapters.js";
 
 export const DEFAULT_CONFIG_PATH = "engineer-profile.config.json";
 
@@ -18,6 +20,45 @@ function readString(source: ConfigValue, key: string, fallback: string): string 
     throw new Error(`Configuration field "${key}" must be a non-empty string.`);
   }
   return value.trim();
+}
+
+function readTheme(source: ConfigValue): string {
+  if (!("theme" in source)) return DEFAULT_CONFIG.theme;
+  const value = source.theme;
+  if (typeof value !== "string" || !isKnownTheme(value)) {
+    throw new Error(
+      `Configuration field "theme" must be one of: aurora, paper, terminal.`
+    );
+  }
+  return value;
+}
+
+function readDeploy(source: ConfigValue): typeof DEFAULT_DEPLOY {
+  if (!("deploy" in source)) return DEFAULT_DEPLOY;
+  if (!isConfigValue(source.deploy)) {
+    throw new Error('Configuration field "deploy" must be an object.');
+  }
+
+  const { adapter, targetDir } = source.deploy;
+  let resolvedAdapter = DEFAULT_DEPLOY.adapter;
+  if (adapter !== undefined) {
+    if (typeof adapter !== "string" || !isKnownAdapter(adapter)) {
+      throw new Error(
+        'Configuration field "deploy.adapter" must be one of: local, none.'
+      );
+    }
+    resolvedAdapter = adapter as typeof DEFAULT_DEPLOY.adapter;
+  }
+
+  let resolvedTarget: string | undefined;
+  if (targetDir !== undefined) {
+    if (typeof targetDir !== "string" || targetDir.trim() === "") {
+      throw new Error('Configuration field "deploy.targetDir" must be a non-empty string.');
+    }
+    resolvedTarget = targetDir.trim();
+  }
+
+  return { adapter: resolvedAdapter, targetDir: resolvedTarget };
 }
 
 function readLimit(source: ConfigValue, key: string, fallback: number): number {
@@ -78,6 +119,8 @@ export function loadPortfolioConfig(
     repositoryLimit: readLimit(parsed, "repositoryLimit", DEFAULT_CONFIG.repositoryLimit),
     dataDir: readString(parsed, "dataDir", DEFAULT_CONFIG.dataDir),
     outputDir: readString(parsed, "outputDir", DEFAULT_CONFIG.outputDir),
+    theme: readTheme(parsed),
+    deploy: readDeploy(parsed),
     privacy: readPrivacy(parsed),
     clock,
   };
