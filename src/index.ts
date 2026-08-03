@@ -5,6 +5,7 @@ import { Command } from "commander";
 import { ingestOwnerRepos, ingestRepository } from "./ingest/orchestrator.js";
 import { captureAllProjects, captureLocalHtml, closeBrowser } from "./preview/capture.js";
 import { copyScreenshotsToOutput, publishSite } from "./publish/site.js";
+import { deployPortfolio } from "./deploy/run.js";
 import { loadAllFixtures } from "./fixtures/loader.js";
 import { openDatabase } from "./db/client.js";
 import { DEFAULT_CONFIG, type PortfolioConfig } from "./types.js";
@@ -65,7 +66,7 @@ addConfigOption(program
 
     const result = publishSite(config);
     const copied = copyScreenshotsToOutput(config);
-    console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
+    console.log(`Published ${result.projectCount} projects with the ${result.theme} theme to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
     console.log("Open output/index.html in a browser.");
   }));
@@ -129,8 +130,24 @@ addConfigOption(program
     const config = resolveConfig(options);
     const result = publishSite(config);
     const copied = copyScreenshotsToOutput(config);
-    console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
+    console.log(`Published ${result.projectCount} projects with the ${result.theme} theme to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
+  }));
+
+addConfigOption(program
+  .command("deploy")
+  .description("Copy the published site to a configured deployment target")
+  .option("-d, --data <dir>", "Data directory")
+  .option("-o, --output <dir>", "Output directory")
+  .option("-t, --target <dir>", "Deployment target directory")
+  .action((options) => {
+    const config = resolveConfig(options);
+    const targetDir = options.target ?? config.deploy.targetDir;
+    const adapter = targetDir && config.deploy.adapter === "none" ? "local" : config.deploy.adapter;
+    const result = deployPortfolio(config, { adapter, targetDir });
+    console.log(
+      `Deployed ${result.filesCopied} files with the ${result.adapter} adapter${result.target ? ` to ${result.target}` : ""}.`
+    );
   }));
 
 addConfigOption(program
@@ -144,8 +161,13 @@ addConfigOption(program
     const result = await refreshPortfolio(config);
     console.log(`Ingested ${result.ingested} repositories for ${config.owner}.`);
     console.log(`Captured ${result.captured} project previews.`);
-    console.log(`Published ${result.published.projectCount} projects to ${result.published.indexPath}.`);
+    console.log(`Published ${result.published.projectCount} projects with the ${result.published.theme} theme to ${result.published.indexPath}.`);
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+    if (result.deployed) {
+      console.log(
+        `Deployed ${result.deployed.filesCopied} files with the ${result.deployed.adapter} adapter${result.deployed.target ? ` to ${result.deployed.target}` : ""}.`
+      );
+    }
     for (const error of result.captureErrors) {
       console.warn(`Skipped ${error.slug}: ${error.message}`);
     }

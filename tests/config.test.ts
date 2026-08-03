@@ -37,4 +37,44 @@ describe("portfolio configuration", () => {
       'Configuration field "repositoryLimit" must be an integer from 1 to 100.'
     );
   });
+
+  it("applies the default theme and deployment adapter", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({ owner: "owner" }));
+
+    const config = loadPortfolioConfig(TEST_FILE, () => "2026-07-31T00:00:00.000Z");
+    expect(config.theme).toBe("aurora");
+    expect(config.deploy.adapter).toBe("none");
+  });
+
+  it("loads a configured theme and local deployment adapter", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({
+      theme: "terminal",
+      deploy: { adapter: "local", targetDir: "docs" },
+    }));
+
+    const config = loadPortfolioConfig(TEST_FILE, () => "2026-07-31T00:00:00.000Z");
+    expect(config.theme).toBe("terminal");
+    expect(config.deploy.adapter).toBe("local");
+    expect(config.deploy.targetDir).toBe("docs");
+  });
+
+  it("rejects an unknown theme", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({ theme: "neon" }));
+
+    expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
+      'Configuration field "theme" must be one of'
+    );
+  });
+
+  it("rejects an unknown deployment adapter", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({ deploy: { adapter: "surge" } }));
+
+    expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
+      'Configuration field "deploy.adapter" must be one of'
+    );
+  });
 });

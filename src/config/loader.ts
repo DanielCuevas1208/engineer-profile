@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
-import type { PortfolioConfig, PrivacyConfig } from "../types.js";
-import { DEFAULT_CONFIG, DEFAULT_PRIVACY } from "../types.js";
+import type { DeploymentConfig, PortfolioConfig, PrivacyConfig } from "../types.js";
+import { DEFAULT_CONFIG, DEFAULT_DEPLOY, DEFAULT_PRIVACY } from "../types.js";
 import { mergePrivacy } from "../privacy/controls.js";
+import { isKnownAdapter, listAdapters } from "../deploy/adapters.js";
+import { isKnownTheme, listThemeNames } from "../theme/themes.js";
 
 export const DEFAULT_CONFIG_PATH = "engineer-profile.config.json";
 
@@ -27,6 +29,39 @@ function readLimit(source: ConfigValue, key: string, fallback: number): number {
     throw new Error(`Configuration field "${key}" must be an integer from 1 to 100.`);
   }
   return value;
+}
+
+function readTheme(source: ConfigValue, fallback: string): string {
+  if (!("theme" in source)) return fallback;
+  const value = source.theme;
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error('Configuration field "theme" must be a non-empty string.');
+  }
+  const name = value.trim();
+  if (!isKnownTheme(name)) {
+    throw new Error(`Configuration field "theme" must be one of: ${listThemeNames().join(", ")}.`);
+  }
+  return name;
+}
+
+function readDeploy(source: ConfigValue): DeploymentConfig {
+  if (!("deploy" in source)) return DEFAULT_DEPLOY;
+  if (!isConfigValue(source.deploy)) {
+    throw new Error('Configuration field "deploy" must be an object.');
+  }
+
+  const { adapter, targetDir } = source.deploy;
+  if (typeof adapter !== "string" || !isKnownAdapter(adapter)) {
+    throw new Error(`Configuration field "deploy.adapter" must be one of: ${listAdapters().join(", ")}.`);
+  }
+  if (targetDir !== undefined && (typeof targetDir !== "string" || targetDir.trim() === "")) {
+    throw new Error('Configuration field "deploy.targetDir" must be a non-empty string.');
+  }
+
+  return {
+    adapter: adapter as DeploymentConfig["adapter"],
+    targetDir: targetDir === undefined ? undefined : targetDir.trim(),
+  };
 }
 
 function readPrivacy(source: ConfigValue): PrivacyConfig {
@@ -78,6 +113,8 @@ export function loadPortfolioConfig(
     repositoryLimit: readLimit(parsed, "repositoryLimit", DEFAULT_CONFIG.repositoryLimit),
     dataDir: readString(parsed, "dataDir", DEFAULT_CONFIG.dataDir),
     outputDir: readString(parsed, "outputDir", DEFAULT_CONFIG.outputDir),
+    theme: readTheme(parsed, DEFAULT_CONFIG.theme),
+    deploy: readDeploy(parsed),
     privacy: readPrivacy(parsed),
     clock,
   };

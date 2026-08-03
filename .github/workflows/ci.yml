@@ -23,7 +23,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Install dependencies
@@ -44,10 +44,21 @@ jobs:
       - name: Run fixture demo
         run: node dist/index.js demo
 
+      - name: Deploy demo output with the local adapter
+        run: node dist/index.js deploy --target deploy-site
+
       - name: Store demo output
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: engineer-profile-demo
           path: output/
+          if-no-files-found: error
+
+      - name: Store deployed site
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineer-profile-deployed
+          path: deploy-site/
           if-no-files-found: error

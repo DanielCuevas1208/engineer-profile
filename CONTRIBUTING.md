@@ -2,7 +2,7 @@
 
 ## Local checks
 
-Use Node.js 20 or newer.
+Use Node.js 22 or newer.
 
 ```bash
 npm ci
@@ -14,6 +14,8 @@ npm test
 
 Use fixtures for changes that need repeatable data.
 Do not add credentials, private repository data, or generated output.
+Keep changes to themes and deployment adapters under `src/theme/` and `src/deploy/`.
+Add deterministic tests for new behavior in `tests/`.
 
 ## Pull requests
 
