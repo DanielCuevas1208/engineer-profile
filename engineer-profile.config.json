@@ -5,6 +5,13 @@
   "repositoryLimit": 5,
   "dataDir": "data",
   "outputDir": "output",
+  "theme": "midnight",
+  "deployment": {
+    "platform": "github-pages"
+  },
+  "feed": {
+    "enabled": true
+  },
   "privacy": {
     "hiddenProjects": [],
     "redactEmails": true,

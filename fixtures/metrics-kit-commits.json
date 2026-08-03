@@ -9,7 +9,9 @@
         "date": "2026-07-20T18:45:00Z"
       }
     },
-    "html_url": "https://github.com/demo-engineer/metrics-kit/commit/e5f6789"
+    "html_url": "https://github.com/demo-engineer/metrics-kit/commit/e5f6789",
+    "stats": { "additions": 61, "deletions": 8, "total": 69 },
+    "files": [{ "filename": "src/export.ts", "additions": 61, "deletions": 8, "status": "added" }]
   },
   {
     "sha": "f6789012345678901234567890abcde12f345678",
@@ -21,7 +23,9 @@
         "date": "2026-07-18T12:30:00Z"
       }
     },
-    "html_url": "https://github.com/demo-engineer/metrics-kit/commit/f678901"
+    "html_url": "https://github.com/demo-engineer/metrics-kit/commit/f678901",
+    "stats": { "additions": 3, "deletions": 21, "total": 24 },
+    "files": [{ "filename": "src/counter.ts", "additions": 3, "deletions": 21, "status": "modified" }]
   },
   {
     "sha": "6789012345678901234567890abcde12f3456789a",
@@ -33,6 +37,8 @@
         "date": "2026-07-12T08:00:00Z"
       }
     },
-    "html_url": "https://github.com/demo-engineer/metrics-kit/commit/6789012"
+    "html_url": "https://github.com/demo-engineer/metrics-kit/commit/6789012",
+    "stats": { "additions": 27, "deletions": 2, "total": 29 },
+    "files": [{ "filename": "test/registry.test.ts", "additions": 27, "deletions": 2, "status": "added" }]
   }
 ]

@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS commits (
   author_email TEXT,
   committed_at TEXT NOT NULL,
   url TEXT NOT NULL,
+  additions INTEGER DEFAULT 0,
+  deletions INTEGER DEFAULT 0,
+  changes INTEGER DEFAULT 0,
+  files_changed INTEGER DEFAULT 0,
   FOREIGN KEY (project_id) REFERENCES projects(id),
   UNIQUE(project_id, sha)
 );
@@ -71,6 +75,10 @@ export class PortfolioDatabase {
     this.db.pragma("foreign_keys = ON");
     this.db.exec(SCHEMA);
     this.ensureColumn("changelog", "source_url", "TEXT");
+    this.ensureColumn("commits", "additions", "INTEGER DEFAULT 0");
+    this.ensureColumn("commits", "deletions", "INTEGER DEFAULT 0");
+    this.ensureColumn("commits", "changes", "INTEGER DEFAULT 0");
+    this.ensureColumn("commits", "files_changed", "INTEGER DEFAULT 0");
   }
 
   private ensureColumn(table: string, column: string, definition: string): void {
@@ -153,12 +161,17 @@ export class PortfolioDatabase {
       author_email: string | null;
       committed_at: string;
       url: string;
+      additions?: number;
+      deletions?: number;
+      changes?: number;
+      files_changed?: number;
     }>
   ): number {
     const stmt = this.db.prepare(
       `INSERT OR IGNORE INTO commits
-        (project_id, sha, message, author_name, author_email, committed_at, url)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`
+        (project_id, sha, message, author_name, author_email, committed_at, url,
+         additions, deletions, changes, files_changed)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     let inserted = 0;
     const insertMany = this.db.transaction((rows) => {
@@ -170,7 +183,11 @@ export class PortfolioDatabase {
           commit.author_name,
           commit.author_email,
           commit.committed_at,
-          commit.url
+          commit.url,
+          commit.additions ?? 0,
+          commit.deletions ?? 0,
+          commit.changes ?? 0,
+          commit.files_changed ?? 0
         );
         if (result.changes > 0) inserted++;
       }
@@ -260,10 +277,16 @@ export class PortfolioDatabase {
     author_name: string | null;
     committed_at: string;
     url: string;
+    additions: number;
+    deletions: number;
+    changes: number;
+    files_changed: number;
   }> {
     return this.db
       .prepare(
-        "SELECT sha, message, author_name, committed_at, url FROM commits WHERE project_id = ? ORDER BY committed_at DESC, id DESC LIMIT ?"
+        `SELECT sha, message, author_name, committed_at, url,
+                additions, deletions, changes, files_changed
+         FROM commits WHERE project_id = ? ORDER BY committed_at DESC, id DESC LIMIT ?`
       )
       .all(projectId, limit) as Array<{
       sha: string;
@@ -271,7 +294,37 @@ export class PortfolioDatabase {
       author_name: string | null;
       committed_at: string;
       url: string;
+      additions: number;
+      deletions: number;
+      changes: number;
+      files_changed: number;
     }>;
+  }
+
+  getDiffSummary(projectId: number): {
+    commits: number;
+    additions: number;
+    deletions: number;
+    changes: number;
+    files: number;
+  } {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS commits,
+                COALESCE(SUM(additions), 0) AS additions,
+                COALESCE(SUM(deletions), 0) AS deletions,
+                COALESCE(SUM(changes), 0) AS changes,
+                COALESCE(SUM(files_changed), 0) AS files
+         FROM commits WHERE project_id = ?`
+      )
+      .get(projectId) as {
+      commits: number;
+      additions: number;
+      deletions: number;
+      changes: number;
+      files: number;
+    };
+    return row;
   }
 
   countCommits(projectId: number): number {

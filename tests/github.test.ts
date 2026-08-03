@@ -107,4 +107,35 @@ describe("commitsToRows", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].sha).toBe("abc123");
   });
+
+  it("maps diff stats onto commit rows", () => {
+    const withStats: GitHubCommit[] = [
+      {
+        sha: "abc123",
+        commit: {
+          message: "feat: add feature",
+          author: { name: "Dev", email: "dev@test.com", date: "2026-01-01T00:00:00Z" },
+        },
+        html_url: "https://github.com/o/r/commit/abc123",
+        stats: { additions: 84, deletions: 12, total: 96 },
+        files: [
+          { filename: "src/app.ts", additions: 84, deletions: 12, status: "modified" },
+          { filename: "src/main.ts", additions: 0, deletions: 0, status: "renamed" },
+        ],
+      },
+    ];
+    const rows = commitsToRows(withStats, DEFAULT_PRIVACY);
+    expect(rows[0].additions).toBe(84);
+    expect(rows[0].deletions).toBe(12);
+    expect(rows[0].changes).toBe(96);
+    expect(rows[0].files_changed).toBe(2);
+  });
+
+  it("defaults missing stats to zero", () => {
+    const rows = commitsToRows(commits, DEFAULT_PRIVACY);
+    expect(rows[0].additions).toBe(0);
+    expect(rows[0].deletions).toBe(0);
+    expect(rows[0].changes).toBe(0);
+    expect(rows[0].files_changed).toBe(0);
+  });
 });

@@ -10,11 +10,14 @@ export interface ParsedCommit {
   description: string;
   breaking: boolean;
   raw: string;
+  additions?: number;
+  deletions?: number;
 }
 
 export function parseConventionalCommit(
   sha: string,
-  message: string
+  message: string,
+  diff?: { additions?: number; deletions?: number }
 ): ParsedCommit | null {
   const firstLine = message.split("\n")[0].trim();
   const match = firstLine.match(CONVENTIONAL_RE);
@@ -26,6 +29,9 @@ export function parseConventionalCommit(
     description: match[3].trim(),
     breaking: firstLine.includes("!:") || firstLine.includes("BREAKING CHANGE"),
     raw: firstLine,
+    ...(diff
+      ? { additions: diff.additions ?? 0, deletions: diff.deletions ?? 0 }
+      : {}),
   };
 }
 
@@ -63,7 +69,15 @@ export function changelogFromCommits(
     b.commit.author.date.localeCompare(a.commit.author.date)
   );
   const parsed = orderedCommits
-    .map((commit) => parseConventionalCommit(commit.sha, commit.commit.message))
+    .map((commit) =>
+      parseConventionalCommit(
+        commit.sha,
+        commit.commit.message,
+        commit.stats
+          ? { additions: commit.stats.additions, deletions: commit.stats.deletions }
+          : undefined
+      )
+    )
     .filter((item): item is ParsedCommit => item !== null);
 
   if (parsed.length === 0 && orderedCommits.length === 0) return null;
@@ -86,7 +100,11 @@ export function changelogFromCommits(
     for (const item of items) {
       const scope = item.scope ? `**${item.scope}:** ` : "";
       const breaking = item.breaking ? " **BREAKING**" : "";
-      lines.push(`- ${scope}${item.description}${breaking} (\`${item.sha.slice(0, 7)}\`)`);
+      const diff = item.additions !== undefined && item.deletions !== undefined &&
+        (item.additions > 0 || item.deletions > 0)
+        ? ` (+${item.additions}/-${item.deletions})`
+        : "";
+      lines.push(`- ${scope}${item.description}${breaking}${diff} (\`${item.sha.slice(0, 7)}\`)`);
     }
     lines.push("");
   }

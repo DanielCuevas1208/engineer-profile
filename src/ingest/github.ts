@@ -15,7 +15,7 @@ export class GitHubClient {
   private headers(): Record<string, string> {
     const headers: Record<string, string> = {
       Accept: "application/vnd.github+json",
-      "User-Agent": "engineer-profile/0.1.0",
+      "User-Agent": "engineer-profile/0.4.0",
     };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
     return headers;
@@ -122,6 +122,10 @@ export function commitsToRows(
   author_email: string | null;
   committed_at: string;
   url: string;
+  additions: number;
+  deletions: number;
+  changes: number;
+  files_changed: number;
 }> {
   return filterCommitsByPrivacy(commits, privacy)
     .map((commit) => ({
@@ -131,5 +135,9 @@ export function commitsToRows(
       author_email: privacy.redactEmails ? null : commit.commit.author.email,
       committed_at: commit.commit.author.date,
       url: commit.html_url,
+      additions: commit.stats?.additions ?? 0,
+      deletions: commit.stats?.deletions ?? 0,
+      changes: commit.stats?.total ?? (commit.stats?.additions ?? 0) + (commit.stats?.deletions ?? 0),
+      files_changed: commit.files?.length ?? 0,
     }));
 }

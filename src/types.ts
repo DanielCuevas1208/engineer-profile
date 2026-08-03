@@ -25,6 +25,17 @@ export interface GitHubCommit {
     };
   };
   html_url: string;
+  stats?: {
+    additions: number;
+    deletions: number;
+    total: number;
+  };
+  files?: Array<{
+    filename: string;
+    additions: number;
+    deletions: number;
+    status: string;
+  }>;
 }
 
 export interface GitHubRelease {
@@ -78,6 +89,25 @@ export interface PrivacyConfig {
   maxCommitsPerProject: number;
 }
 
+export interface ThemeConfig {
+  name: string;
+  customCss: string | null;
+}
+
+export type DeploymentPlatform = "none" | "github-pages";
+
+export interface DeploymentConfig {
+  platform: DeploymentPlatform;
+  cname: string | null;
+}
+
+export interface FeedConfig {
+  enabled: boolean;
+  limit: number;
+  description: string | null;
+  siteUrl: string | null;
+}
+
 export interface PortfolioConfig {
   owner: string;
   title: string;
@@ -86,6 +116,9 @@ export interface PortfolioConfig {
   dataDir: string;
   outputDir: string;
   privacy: PrivacyConfig;
+  theme: ThemeConfig;
+  deployment: DeploymentConfig;
+  feed: FeedConfig;
   clock: () => string;
 }
 
@@ -93,6 +126,23 @@ export const DEFAULT_PRIVACY: PrivacyConfig = {
   hiddenProjects: [],
   redactEmails: true,
   maxCommitsPerProject: 50,
+};
+
+export const DEFAULT_THEME: ThemeConfig = {
+  name: "midnight",
+  customCss: null,
+};
+
+export const DEFAULT_DEPLOYMENT: DeploymentConfig = {
+  platform: "none",
+  cname: null,
+};
+
+export const DEFAULT_FEED: FeedConfig = {
+  enabled: true,
+  limit: 20,
+  description: null,
+  siteUrl: null,
 };
 
 export const DEFAULT_CONFIG = {
@@ -103,5 +153,8 @@ export const DEFAULT_CONFIG = {
   dataDir: "data",
   outputDir: "output",
   privacy: DEFAULT_PRIVACY,
+  theme: DEFAULT_THEME,
+  deployment: DEFAULT_DEPLOYMENT,
+  feed: DEFAULT_FEED,
   clock: () => new Date().toISOString(),
 } satisfies PortfolioConfig;

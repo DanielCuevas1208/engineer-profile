@@ -9,7 +9,9 @@
         "date": "2026-07-15T14:22:00Z"
       }
     },
-    "html_url": "https://github.com/demo-engineer/signal-router/commit/a1b2c3d"
+    "html_url": "https://github.com/demo-engineer/signal-router/commit/a1b2c3d",
+    "stats": { "additions": 84, "deletions": 12, "total": 96 },
+    "files": [{ "filename": "src/router.ts", "additions": 84, "deletions": 12, "status": "modified" }]
   },
   {
     "sha": "b2c3d4e5f6789012345678901234567890abcde1",
@@ -21,7 +23,9 @@
         "date": "2026-07-10T09:15:00Z"
       }
     },
-    "html_url": "https://github.com/demo-engineer/signal-router/commit/b2c3d4e"
+    "html_url": "https://github.com/demo-engineer/signal-router/commit/b2c3d4e",
+    "stats": { "additions": 10, "deletions": 4, "total": 14 },
+    "files": [{ "filename": "src/backpressure.ts", "additions": 10, "deletions": 4, "status": "modified" }]
   },
   {
     "sha": "c3d4e5f6789012345678901234567890abcde12f",
@@ -33,7 +37,9 @@
         "date": "2026-07-05T16:40:00Z"
       }
     },
-    "html_url": "https://github.com/demo-engineer/signal-router/commit/c3d4e5f"
+    "html_url": "https://github.com/demo-engineer/signal-router/commit/c3d4e5f",
+    "stats": { "additions": 32, "deletions": 0, "total": 32 },
+    "files": [{ "filename": "docs/topology.md", "additions": 32, "deletions": 0, "status": "added" }]
   },
   {
     "sha": "d4e5f6789012345678901234567890abcde12f34",
@@ -45,6 +51,8 @@
         "date": "2026-06-28T11:00:00Z"
       }
     },
-    "html_url": "https://github.com/demo-engineer/signal-router/commit/d4e5f67"
+    "html_url": "https://github.com/demo-engineer/signal-router/commit/d4e5f67",
+    "stats": { "additions": 5, "deletions": 5, "total": 10 },
+    "files": [{ "filename": ".github/workflows/ci.yml", "additions": 5, "deletions": 5, "status": "modified" }]
   }
 ]

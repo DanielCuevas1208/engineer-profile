@@ -1,20 +1,25 @@
-name: Scheduled portfolio refresh
+name: Deploy portfolio to GitHub Pages
 
 on:
   schedule:
-    - cron: "17 5 * * 1"
+    - cron: "23 5 * * 1"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: engineer-profile-refresh
+  group: engineer-profile-pages
   cancel-in-progress: true
 
 jobs:
-  refresh:
+  deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.base_url }}
     env:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
@@ -36,9 +41,18 @@ jobs:
       - name: Refresh portfolio
         run: npm run refresh -- --config engineer-profile.config.json
 
-      - name: Store refreshed site
-        uses: actions/upload-artifact@v4
+      - name: Stage deployment files
+        run: node dist/index.js deploy
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: engineer-profile-refresh
           path: output/
-          if-no-files-found: error
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

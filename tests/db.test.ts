@@ -94,6 +94,84 @@ describe("PortfolioDatabase", () => {
     db.close();
   });
 
+  it("aggregates commit diff totals per project", () => {
+    const db = openDatabase(TEST_DATA);
+    const project = db.upsertProject({
+      slug: "diff",
+      name: "Diff",
+      description: null,
+      url: "https://github.com/o/diff",
+      homepage: null,
+      language: null,
+      stars: 0,
+      forks: 0,
+      topics: "[]",
+      last_pushed: "2026-01-01T00:00:00Z",
+      visible: 1,
+      screenshot_path: null,
+      ingested_at: "2026-01-01T00:00:00Z",
+    });
+
+    db.upsertCommits(project.id, [
+      {
+        sha: "one",
+        message: "feat: a",
+        author_name: "Dev",
+        author_email: null,
+        committed_at: "2026-01-02T00:00:00Z",
+        url: "https://github.com/o/diff/commit/one",
+        additions: 84,
+        deletions: 12,
+        changes: 96,
+        files_changed: 3,
+      },
+      {
+        sha: "two",
+        message: "fix: b",
+        author_name: "Dev",
+        author_email: null,
+        committed_at: "2026-01-01T00:00:00Z",
+        url: "https://github.com/o/diff/commit/two",
+        additions: 5,
+        deletions: 9,
+        changes: 14,
+        files_changed: 1,
+      },
+    ]);
+
+    const summary = db.getDiffSummary(project.id);
+    expect(summary).toEqual({ commits: 2, additions: 89, deletions: 21, changes: 110, files: 4 });
+    db.close();
+  });
+
+  it("returns zero totals when no commits exist", () => {
+    const db = openDatabase(TEST_DATA);
+    const project = db.upsertProject({
+      slug: "empty",
+      name: "Empty",
+      description: null,
+      url: "https://github.com/o/empty",
+      homepage: null,
+      language: null,
+      stars: 0,
+      forks: 0,
+      topics: "[]",
+      last_pushed: "2026-01-01T00:00:00Z",
+      visible: 1,
+      screenshot_path: null,
+      ingested_at: "2026-01-01T00:00:00Z",
+    });
+
+    expect(db.getDiffSummary(project.id)).toEqual({
+      commits: 0,
+      additions: 0,
+      deletions: 0,
+      changes: 0,
+      files: 0,
+    });
+    db.close();
+  });
+
   it("filters visible projects only", () => {
     const db = openDatabase(TEST_DATA);
     const visible = {

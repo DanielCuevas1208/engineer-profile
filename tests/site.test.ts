@@ -87,6 +87,29 @@ describe("database and publish pipeline", () => {
     expect(html).toContain("total stars");
   });
 
+  it("marks the published page with the configured theme", async () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      dataDir: TEST_DATA,
+      outputDir: TEST_OUTPUT,
+      theme: { name: "terminal", customCss: null },
+    };
+    await ingestRepository(
+      config,
+      { owner: "demo-engineer", repo: "signal-router" },
+      {
+        repo: loadFixtureRepo("signal-router"),
+        commits: loadFixtureCommits("signal-router"),
+        releases: loadFixtureReleases("signal-router"),
+      }
+    );
+
+    const result = publishSite(config);
+    const html = readFileSync(result.indexPath, "utf-8");
+    expect(html).toContain('data-theme="terminal"');
+    expect(html).toContain("--font-mono");
+  });
+
   it("respects visibility when publishing", async () => {
     const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT };
     await ingestRepository(
@@ -126,5 +149,66 @@ describe("database and publish pipeline", () => {
     expect(existsSync(changelogPath)).toBe(true);
     const md = readFileSync(changelogPath, "utf-8");
     expect(md).toContain("v0.3.0");
+  });
+
+  it("publishes commit diff totals on project cards", async () => {
+    const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT };
+    await ingestRepository(
+      config,
+      { owner: "demo-engineer", repo: "signal-router" },
+      {
+        repo: loadFixtureRepo("signal-router"),
+        commits: loadFixtureCommits("signal-router"),
+        releases: loadFixtureReleases("signal-router"),
+      }
+    );
+
+    const result = publishSite(config);
+    const html = readFileSync(result.indexPath, "utf-8");
+    expect(html).toContain("+131 added");
+    expect(html).toContain("-21 removed");
+    expect(html).toContain("diff-signal");
+  });
+
+  it("links the RSS feed from the page head", async () => {
+    const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT };
+    await ingestRepository(
+      config,
+      { owner: "demo-engineer", repo: "signal-router" },
+      {
+        repo: loadFixtureRepo("signal-router"),
+        commits: loadFixtureCommits("signal-router"),
+        releases: loadFixtureReleases("signal-router"),
+      }
+    );
+
+    const result = publishSite(config);
+    const html = readFileSync(result.indexPath, "utf-8");
+    expect(html).toContain('rel="alternate" type="application/rss+xml"');
+    expect(html).toContain('href="feed.xml"');
+  });
+
+  it("omits the feed link when the feed is disabled", async () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      dataDir: TEST_DATA,
+      outputDir: TEST_OUTPUT,
+      feed: { ...DEFAULT_CONFIG.feed, enabled: false },
+    };
+    await ingestRepository(
+      config,
+      { owner: "demo-engineer", repo: "signal-router" },
+      {
+        repo: loadFixtureRepo("signal-router"),
+        commits: loadFixtureCommits("signal-router"),
+        releases: loadFixtureReleases("signal-router"),
+      }
+    );
+
+    const result = publishSite(config);
+    expect(result.feed).toBeNull();
+    expect(existsSync(join(TEST_OUTPUT, "feed.xml"))).toBe(false);
+    const html = readFileSync(result.indexPath, "utf-8");
+    expect(html).not.toContain('type="application/rss+xml"');
   });
 });

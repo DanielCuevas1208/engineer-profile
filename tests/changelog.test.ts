@@ -82,6 +82,38 @@ describe("changelogFromCommits", () => {
   it("returns null for empty commits", () => {
     expect(changelogFromCommits([])).toBeNull();
   });
+
+  it("appends diff totals to conventional commit bullets", () => {
+    const withStats: GitHubCommit[] = [
+      {
+        sha: "abc123def456",
+        commit: {
+          message: "feat(api): add health endpoint",
+          author: { name: "Dev", email: "dev@test.com", date: "2026-01-15T10:00:00Z" },
+        },
+        html_url: "https://github.com/o/r/commit/abc123",
+        stats: { additions: 42, deletions: 7, total: 49 },
+      },
+      {
+        sha: "def456abc789",
+        commit: {
+          message: "fix(db): close connection on shutdown",
+          author: { name: "Dev", email: "dev@test.com", date: "2026-01-14T10:00:00Z" },
+        },
+        html_url: "https://github.com/o/r/commit/def456",
+        stats: { additions: 2, deletions: 11, total: 13 },
+      },
+    ];
+    const section = changelogFromCommits(withStats);
+    expect(section).not.toBeNull();
+    expect(section!.body).toContain("add health endpoint (+42/-7)");
+    expect(section!.body).toContain("close connection on shutdown (+2/-11)");
+  });
+
+  it("omits diff markers when a commit has no stats", () => {
+    const section = changelogFromCommits(sampleCommits);
+    expect(section!.body).not.toMatch(/\(\+\d+\/-\d+\)/);
+  });
 });
 
 describe("buildChangelog", () => {
