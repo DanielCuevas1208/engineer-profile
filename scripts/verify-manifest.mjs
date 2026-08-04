@@ -97,6 +97,22 @@ try {
 if (!indexHtml.includes("Commit trail")) {
   fail("index.html does not render the commit trail");
 }
+if (!indexHtml.includes("font-family: var(--font);")) {
+  fail("index.html does not apply the theme font token");
+}
+const projectCardRule = indexHtml.slice(
+  indexHtml.indexOf(".project-card"),
+  indexHtml.indexOf(".project-card") + 400
+);
+if (!projectCardRule.includes("border-radius: var(--radius);")) {
+  fail("index.html does not apply the theme radius token to project cards");
+}
+if (!indexHtml.includes("--font:")) {
+  fail("index.html does not declare a theme font variable");
+}
+if (!indexHtml.includes("--radius:")) {
+  fail("index.html does not declare a theme radius variable");
+}
 
 console.log(
   `Manifest ok: ${manifest.projectCount} projects, theme ${theme.name} (${theme.mode}), ` +

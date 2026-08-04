@@ -3,7 +3,7 @@ import { rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { openDatabase } from "../src/db/client.js";
 import { ingestRepository } from "../src/ingest/orchestrator.js";
-import { publishSite, copyScreenshotsToOutput } from "../src/publish/site.js";
+import { publishSite } from "../src/publish/site.js";
 import { loadFixtureRepo, loadFixtureCommits, loadFixtureReleases } from "../src/fixtures/loader.js";
 import { DEFAULT_CONFIG } from "../src/types.js";
 

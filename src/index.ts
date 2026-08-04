@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { Command } from "commander";
 import { ingestOwnerRepos, ingestRepository } from "./ingest/orchestrator.js";
 import { captureAllProjects, captureLocalHtml, closeBrowser } from "./preview/capture.js";
-import { copyScreenshotsToOutput, publishSite } from "./publish/site.js";
+import { publishSite } from "./publish/site.js";
 import { loadAllFixtures } from "./fixtures/loader.js";
 import { openDatabase } from "./db/client.js";
 import { DEFAULT_CONFIG, type PortfolioConfig } from "./types.js";
@@ -67,9 +67,8 @@ addConfigOption(program
     }
 
     const result = publishSite(config);
-    const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
-    console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
     console.log(`Wrote theme gallery to ${result.galleryPath}.`);
     console.log(`Wrote RSS feed to ${result.feedPath}.`);
     console.log("Open output/index.html in a browser.");
@@ -133,9 +132,8 @@ addConfigOption(program
   .action((options) => {
     const config = resolveConfig(options);
     const result = publishSite(config);
-    const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
-    console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
     console.log(`Wrote RSS feed to ${result.feedPath}.`);
   }));
 
@@ -197,9 +195,8 @@ addConfigOption(program
     const config = resolveConfig(options);
     mkdirSync(config.dataDir, { recursive: true });
     const result = publishSite(config);
-    const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
-    console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
     console.log(`Wrote RSS feed to ${result.feedPath}.`);
     const results = deployAll(config);
     if (results.length === 0) {

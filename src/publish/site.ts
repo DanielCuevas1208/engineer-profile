@@ -200,7 +200,7 @@ function siteCss(theme: ThemeTokens): string {
 ${themeVariables(theme)}
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; min-width: 320px; background: var(--ink); color: var(--text); line-height: 1.5; }
+body { margin: 0; min-width: 320px; background: var(--ink); color: var(--text); font-family: var(--font); line-height: 1.5; }
 a { color: inherit; }
 .site-shell { min-height: 100vh; background: var(--glow), var(--ink); }
 .container { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
@@ -215,7 +215,7 @@ a { color: inherit; }
 .kicker { color: var(--mint); margin: 0 0 22px; }
 h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-weight: 650; letter-spacing: -0.08em; line-height: 0.94; }
 .hero-copy { max-width: 530px; margin: 28px 0 0; color: var(--blue-soft); font-size: 1.12rem; }
-.hero-aside { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--aside-gradient); box-shadow: var(--shadow); }
+.hero-aside { padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--aside-gradient); box-shadow: var(--shadow); }
 .aside-index { display: flex; justify-content: space-between; color: var(--orange); font: 0.68rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.12em; text-transform: uppercase; }
 .hero-aside p { margin: 24px 0 4px; color: var(--text); font-size: 1rem; }
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -223,14 +223,14 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 .stat:last-child { border-right: 0; }
 .stat strong { display: block; color: var(--text); font-size: 1.8rem; font-weight: 600; letter-spacing: -0.04em; }
 .stat span { color: var(--muted); font: 0.7rem/1.3 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-transform: uppercase; }
-.audit-panel { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; margin: 26px 0 80px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--audit-bg); }
+.audit-panel { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; margin: 26px 0 80px; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--audit-bg); }
 .audit-copy { color: var(--muted); font-size: 0.88rem; }
 .audit-copy strong { color: var(--text); font-weight: 500; }
 .audit-time { color: var(--blue); font: 0.7rem/1.4 "SFMono-Regular", Consolas, monospace; text-align: right; }
 .index-header { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 24px; }
 .index-header h2 { margin: 0; font-size: 2rem; font-weight: 550; letter-spacing: -0.05em; }
 .index-header p { max-width: 350px; margin: 0; color: var(--muted); font-size: 0.88rem; text-align: right; }
-.project-card { display: grid; grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr); overflow: hidden; margin-bottom: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel-gradient); box-shadow: var(--shadow); }
+.project-card { display: grid; grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr); overflow: hidden; margin-bottom: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-gradient); box-shadow: var(--shadow); }
 .project-visual { position: relative; min-height: 310px; background: var(--visual); }
 .screenshot { display: block; width: 100%; height: 100%; min-height: 310px; object-fit: cover; opacity: 0.9; }
 .placeholder { display: flex; min-height: 310px; align-items: center; justify-content: center; flex-direction: column; gap: 7px; color: var(--blue); background: repeating-linear-gradient(135deg, var(--stripe), var(--stripe) 1px, transparent 1px, transparent 14px); }
@@ -265,7 +265,7 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 .muted { color: var(--muted); }
 .commit-trail { margin: 80px 0; }
 .trail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
-.trail-card { padding: 22px 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-gradient); box-shadow: var(--shadow); }
+.trail-card { padding: 22px 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-gradient); box-shadow: var(--shadow); }
 .trail-topline { display: flex; justify-content: space-between; gap: 12px; color: var(--blue); font: 0.66rem/1.4 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.1em; text-transform: uppercase; }
 .trail-card h3 { margin: 14px 0 12px; font-size: 1.15rem; font-weight: 560; letter-spacing: -0.03em; }
 .trail-card h3 a { text-decoration: none; }
@@ -340,6 +340,7 @@ export interface PublishResult {
   projectCount: number;
   generatedAt: string;
   theme: string;
+  copiedScreenshots: number;
 }
 
 function relativePosixPaths(outputDir: string): string[] {
@@ -486,7 +487,7 @@ export function publishSite(config: PortfolioConfig): PublishResult {
       writeFileSync(join(config.outputDir, `${view.project.slug}-changes.md`), markdown, "utf-8");
     }
 
-    copyScreenshotsToOutput(config);
+    const copiedScreenshots = copyScreenshotsToOutput(config);
 
     const galleryPath = join(config.outputDir, "theme-gallery.html");
     const galleryEntries = [
@@ -570,6 +571,7 @@ export function publishSite(config: PortfolioConfig): PublishResult {
       projectCount: projects.length,
       generatedAt,
       theme: theme.name,
+      copiedScreenshots,
     };
   } finally {
     db.close();

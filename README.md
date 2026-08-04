@@ -12,6 +12,7 @@ paths in SQLite. It publishes a static site from these records.
 - Capture repeatable project previews with Playwright.
 - Hide projects and redact author emails before publication.
 - Choose a built-in theme and override accent, radius, and font.
+  The published page applies every override to its CSS tokens.
 - Compare every theme in a generated gallery page.
 - Summarize commit activity between release windows.
 - Publish an RSS feed from visible projects.
@@ -113,6 +114,11 @@ Set the theme with a name from the built-in catalog.
 `font` sets the base font stack.
 All overrides are optional.
 
+The site applies the theme tokens to its generated CSS.
+`--font` sets the base font of the page body.
+`--radius` sets the corner radius of cards and panels.
+The publish step writes these tokens into every generated page.
+
 Run `node dist/index.js themes` to list the catalog.
 The catalog contains `deep-space`, `paper`, and `terminal`.
 The loader rejects unknown theme names and invalid accent colors.
@@ -145,7 +151,7 @@ The loader rejects feed base URLs that are not absolute http(s) URLs.
 
 Deploy syncs the published output to one or more local targets.
 A target must live outside the output directory.
-Sync removes files that are no longer part of the snapshot.
+Deploy removes stale files first, then copies the new snapshot.
 It copies the snapshot, then verifies the key output files.
 Each deploy records an audit entry with the file counts.
 
@@ -291,6 +297,7 @@ The test suite covers these core behaviors:
 - Release source links.
 - Deterministic HTML, manifest, gallery, and feed output.
 - Theme resolution, CSS variable emission, and gallery rendering.
+- Generated CSS token application for font and radius.
 - Local deploy sync, stale cleanup, and verification.
 - Site manifest versioning, determinism, and theme details.
 - Playwright screenshot capture.
@@ -309,7 +316,7 @@ Typecheck, build, and all tests pass locally.
 CI runs the complete test suite on Ubuntu with Chromium installed.
 The fixture pipeline provides deterministic data for repeatable checks.
 The demo output feeds two verification scripts in CI.
-They check the site manifest, the RSS feed, and the deployed snapshot.
+They check the site manifest, the generated CSS tokens, the RSS feed, and the deployed snapshot.
 
 ## Limitations
 
@@ -332,7 +339,7 @@ They check the site manifest, the RSS feed, and the deployed snapshot.
 | --- | --- | --- |
 | v0.1 | Complete | Fixture demo, GitHub ingest, changelog, capture, publish, and privacy controls. |
 | v0.2 | Complete | Checked-in configuration, coordinated refresh command, and scheduled artifact workflow. |
-| v0.3 | Complete | Built-in themes, theme overrides, theme gallery page, versioned site manifest, and local deploy sync. |
+| v0.3 | Complete | Built-in themes, theme overrides, generated CSS tokens for font and radius, theme gallery page, versioned site manifest, and local deploy sync. |
 | v0.4 | Complete | Commit-diff summaries, a commit trail on the site, and an RSS feed. |
 | v0.5 | Next | Remote deploy adapters and preview diffs. |
 | v0.6 | Later | Release brief digests and changelog archiving. |
