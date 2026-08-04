@@ -19,7 +19,7 @@ const program = new Command();
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.3.0");
+  .version("0.4.0");
 
 function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
   const base = options.config
@@ -71,6 +71,7 @@ addConfigOption(program
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
     console.log(`Wrote theme gallery to ${result.galleryPath}.`);
+    console.log(`Wrote RSS feed to ${result.feedPath}.`);
     console.log("Open output/index.html in a browser.");
   }));
 
@@ -135,6 +136,7 @@ addConfigOption(program
     const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Wrote RSS feed to ${result.feedPath}.`);
   }));
 
 addConfigOption(program
@@ -150,6 +152,7 @@ addConfigOption(program
     console.log(`Captured ${result.captured} project previews.`);
     console.log(`Published ${result.published.projectCount} projects to ${result.published.indexPath}.`);
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+    console.log(`Wrote RSS feed to ${result.published.feedPath}.`);
     for (const error of result.captureErrors) {
       console.warn(`Skipped ${error.slug}: ${error.message}`);
     }
@@ -197,6 +200,7 @@ addConfigOption(program
     const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Wrote RSS feed to ${result.feedPath}.`);
     const results = deployAll(config);
     if (results.length === 0) {
       console.log('No deploy targets configured. Add a "deploy.targets" entry to the configuration.');

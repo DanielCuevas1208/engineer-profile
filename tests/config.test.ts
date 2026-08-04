@@ -72,6 +72,33 @@ describe("portfolio configuration", () => {
     );
   });
 
+  it("loads feed settings", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({
+      feed: { baseUrl: "https://portfolio.example.com/" },
+    }));
+
+    const config = loadPortfolioConfig(TEST_FILE);
+    expect(config.feed.baseUrl).toBe("https://portfolio.example.com");
+  });
+
+  it("defaults the feed settings", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({ owner: "owner" }));
+
+    const config = loadPortfolioConfig(TEST_FILE);
+    expect(config.feed.baseUrl).toBeUndefined();
+  });
+
+  it("rejects invalid feed base URLs", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({ feed: { baseUrl: "not a url" } }));
+
+    expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
+      'Configuration field "feed.baseUrl" must be an absolute http(s) URL.'
+    );
+  });
+
   it("rejects unsupported deploy adapter types", () => {
     mkdirSync(TEST_DIR, { recursive: true });
     writeFileSync(TEST_FILE, JSON.stringify({

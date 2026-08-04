@@ -27,16 +27,19 @@ describe("deterministic publishing", () => {
     const fixtures = loadAllFixtures();
     const html = [];
     const galleries = [];
+    const feeds = [];
     for (let index = 0; index < RUNS.length; index++) {
       const config = fixedConfig(RUNS[index], OUTPUTS[index]);
       await ingestOwnerRepos(config, config.owner, fixtures.length, fixtures);
       const result = publishSite(config);
       html.push(readFileSync(result.indexPath, "utf-8"));
       galleries.push(readFileSync(result.galleryPath, "utf-8"));
+      feeds.push(readFileSync(result.feedPath, "utf-8"));
     }
 
     expect(html[0]).toBe(html[1]);
     expect(galleries[0]).toBe(galleries[1]);
+    expect(feeds[0]).toBe(feeds[1]);
     expect(html[0]).toContain("2026-07-31 00:00:00 UTC");
   });
 
@@ -48,5 +51,7 @@ describe("deterministic publishing", () => {
 
     expect(html).toContain("https://github.com/demo-engineer/signal-router/releases/tag/v0.3.0");
     expect(existsSync(join(OUTPUTS[0], "demo-engineer-signal-router-changelog.md"))).toBe(true);
+    expect(existsSync(join(OUTPUTS[0], "demo-engineer-signal-router-changes.md"))).toBe(true);
+    expect(existsSync(join(OUTPUTS[0], "feed.xml"))).toBe(true);
   });
 });

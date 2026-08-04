@@ -19,6 +19,8 @@ Run `node dist/index.js themes --preview` after gallery changes.
 Verify `output/site-manifest.json` after publish changes.
 Check the deploy sync with `node dist/index.js deploy`.
 Run `node scripts/verify-manifest.mjs` and `node scripts/verify-deploy.mjs` after CI-only changes.
+Verify `output/feed.xml` after changelog or feed changes.
+Check `output/*-changes.md` after commit-diff changes.
 
 ## Pull requests
 

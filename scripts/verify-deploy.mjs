@@ -7,7 +7,7 @@ function fail(message) {
   process.exit(1);
 }
 
-for (const file of ["index.html", "site-manifest.json", "theme-gallery.html"]) {
+for (const file of ["index.html", "site-manifest.json", "theme-gallery.html", "feed.xml"]) {
   if (!existsSync(`${DEPLOY_DIR}/${file}`)) {
     fail(`deployed snapshot is missing ${file}`);
   }

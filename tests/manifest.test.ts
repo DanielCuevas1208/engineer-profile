@@ -51,13 +51,15 @@ describe("site manifest", () => {
     const manifest = JSON.parse(readFileSync(result.manifestPath, "utf-8")) as {
       formatVersion: number;
       theme: { name: string; mode: string; accent: string; radius: string; font: string };
+      feed: string;
       projectCount: number;
-      projects: Array<{ slug: string; url: string; changelogFile: string | null }>;
+      projects: Array<{ slug: string; url: string; changelogFile: string | null; changesFile: string | null }>;
       files: string[];
       screenshots: string[];
     };
 
-    expect(manifest.formatVersion).toBe(2);
+    expect(manifest.formatVersion).toBe(3);
+    expect(manifest.feed).toBe("feed.xml");
     expect(manifest.theme.name).toBe("paper");
     expect(manifest.theme.mode).toBe("light");
     expect(manifest.theme.accent).toBe("#0f6bbd");
@@ -66,9 +68,12 @@ describe("site manifest", () => {
     expect(manifest.projects[0].slug).toBe("demo-engineer-signal-router");
     expect(manifest.projects[0].url).toBe("https://github.com/demo-engineer/signal-router");
     expect(manifest.projects[0].changelogFile).toBe("demo-engineer-signal-router-changelog.md");
+    expect(manifest.projects[0].changesFile).toBe("demo-engineer-signal-router-changes.md");
     expect(manifest.files).toContain("index.html");
     expect(manifest.files).toContain("site-manifest.json");
     expect(manifest.files).toContain("theme-gallery.html");
+    expect(manifest.files).toContain("feed.xml");
+    expect(manifest.files).toContain("demo-engineer-signal-router-changes.md");
     expect(Array.isArray(manifest.screenshots)).toBe(true);
   });
 

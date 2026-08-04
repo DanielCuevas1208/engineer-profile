@@ -87,6 +87,37 @@ describe("database and publish pipeline", () => {
     expect(html).toContain("total stars");
   });
 
+  it("publishes an RSS feed and a commit trail", async () => {
+    const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT };
+    await ingestRepository(
+      config,
+      { owner: "demo-engineer", repo: "signal-router" },
+      {
+        repo: loadFixtureRepo("signal-router"),
+        commits: loadFixtureCommits("signal-router"),
+        releases: loadFixtureReleases("signal-router"),
+      }
+    );
+
+    const result = publishSite(config);
+    expect(existsSync(result.feedPath)).toBe(true);
+
+    const feed = readFileSync(result.feedPath, "utf-8");
+    expect(feed).toContain("<rss version=\"2.0\"");
+    expect(feed).toContain("<item>");
+    expect(feed).toContain("signal-router");
+    expect(feed).toContain("<category>typescript</category>");
+
+    const changesPath = join(TEST_OUTPUT, "demo-engineer-signal-router-changes.md");
+    expect(existsSync(changesPath)).toBe(true);
+    const changes = readFileSync(changesPath, "utf-8");
+    expect(changes).toContain("Commit trail");
+
+    const html = readFileSync(result.indexPath, "utf-8");
+    expect(html).toContain("Commit trail");
+    expect(html).toContain("href=\"feed.xml\"");
+  });
+
   it("respects visibility when publishing", async () => {
     const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT };
     await ingestRepository(

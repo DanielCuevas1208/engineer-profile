@@ -13,6 +13,8 @@ paths in SQLite. It publishes a static site from these records.
 - Hide projects and redact author emails before publication.
 - Choose a built-in theme and override accent, radius, and font.
 - Compare every theme in a generated gallery page.
+- Summarize commit activity between release windows.
+- Publish an RSS feed from visible projects.
 - Deploy the snapshot to configured local targets.
 - Sync targets and remove stale files before verification.
 - Record a machine-readable manifest with every publish.
@@ -37,22 +39,26 @@ flowchart LR
   S --> W
   W --> O[Static output]
   T[Theme] --> W
+  D --> F[Diff summaries]
+  F --> W
   W --> M[Manifest]
+  W --> X[RSS feed]
   M --> K[Deploy]
+  X --> K
 ```
 
 | Area | Responsibility |
 | --- | --- |
-| `engineer-profile.config.json` | Store owner, presentation, refresh, theme, deploy, and privacy settings. |
+| `engineer-profile.config.json` | Store owner, presentation, refresh, theme, feed, deploy, and privacy settings. |
 | `src/config/` | Validate checked-in JSON and merge safe defaults. |
 | `src/theme/` | Resolve built-in themes, emit CSS variables, and render a theme gallery. |
+| `src/changelog/` | Prefer release notes, fall back to commit groups, and summarize commit diffs. |
 | `src/refresh/` | Coordinate ingest, best-effort capture, static publishing, and deploy. |
 | `src/ingest/` | Fetch public GitHub data and map it to records. |
 | `src/db/` | Store projects, commits, changelogs, and audit events. |
-| `src/changelog/` | Prefer release notes and fall back to commit groups. |
 | `src/privacy/` | Hide projects and block sensitive commit messages. |
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
-| `src/publish/` | Render HTML, changelog files, the theme gallery, the site manifest, and preview assets. |
+| `src/publish/` | Render HTML, changelog files, commit-trail files, the theme gallery, the RSS feed, the site manifest, and preview assets. |
 | `src/deploy/` | Sync published output to local targets and verify the snapshot. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
@@ -71,6 +77,7 @@ npm run demo
 
 Open `output/index.html` in a browser.
 Open `output/theme-gallery.html` to compare the built-in themes.
+Open `output/feed.xml` to inspect the RSS feed.
 
 The demo creates a local SQLite database under `data/`.
 It writes the static site under `output/`.
@@ -79,7 +86,7 @@ Both directories are ignored by Git.
 ## Configuration
 
 `engineer-profile.config.json` is the checked-in source for scheduled refreshes.
-It sets the GitHub owner, site presentation, repository limit, paths, theme, deploy, and privacy controls.
+It sets the GitHub owner, site presentation, repository limit, paths, theme, feed, deploy, and privacy controls.
 
 The loader accepts repository limits from 1 through 100.
 It rejects malformed values before network access.
@@ -114,6 +121,25 @@ Run `node dist/index.js themes --preview` to write a theme gallery page.
 The page renders every theme with its real tokens.
 It includes a `configured` card for your overrides.
 Every published snapshot also contains `theme-gallery.html`.
+
+### Feed
+
+The publish step writes `output/feed.xml` as an RSS 2.0 document.
+Each visible project becomes one feed item.
+Items use the project description, the latest changelog signal, and the repository link.
+
+Set the feed base URL for a hosted site.
+
+```json
+{
+  "feed": {
+    "baseUrl": "https://portfolio.example.com"
+  }
+}
+```
+
+Without a base URL, the feed links to `https://github.com/<owner>`.
+The loader rejects feed base URLs that are not absolute http(s) URLs.
 
 ### Deploy
 
@@ -174,6 +200,7 @@ Captured demo-engineer-metrics-kit.
 Published 2 projects to output/index.html.
 Copied 2 available preview screenshots.
 Wrote theme gallery to output/theme-gallery.html.
+Wrote RSS feed to output/feed.xml.
 Open output/index.html in a browser.
 ```
 
@@ -184,8 +211,13 @@ Open output/index.html in a browser.
 The site shows project facts, source links, changelog previews, and screenshots.
 The totals come from fixture fields and stored commit records.
 
+The index renders a commit trail below the project cards.
+The trail groups stored commits into release windows.
+Each window lists its commit count and change types.
+The full detail lives in `output/<slug>-changes.md`.
+
 The demo also writes `output/site-manifest.json`.
-The manifest records the theme details, project list, and generated files.
+The manifest records the theme details, project list, generated files, and the RSS feed.
 
 ## Commands
 
@@ -207,6 +239,8 @@ Build before direct CLI commands.
 | `npm test` | Run deterministic unit and integration tests. |
 | `npm run typecheck` | Validate TypeScript types. |
 | `npm run build` | Compile the CLI to `dist/`. |
+
+Publish, refresh, and deploy write the RSS feed and commit-trail files with the snapshot.
 
 ## Privacy controls
 
@@ -238,7 +272,8 @@ Deploy operations keep their target name and verification state in the audit tra
 ## CI and test status
 
 The regular CI workflow runs typecheck, build, tests, the fixture demo, theme
-verification, manifest verification, local deploy verification, and artifact upload.
+verification, manifest verification, RSS feed verification, local deploy verification,
+and artifact upload.
 The scheduled refresh workflow runs each Monday and supports manual dispatch.
 It uploads the generated site as a workflow artifact.
 
@@ -247,12 +282,14 @@ The test suite covers these core behaviors:
 - Configuration validation and default merging.
 - Conventional commit parsing.
 - Release-first changelog generation.
+- Commit-diff summaries and release-window bucketing.
+- RSS feed rendering, escaping, and determinism.
 - SQLite upserts and changelog replacement.
 - Privacy filtering and email redaction.
 - Fixture ingestion and static publishing.
 - Configured refresh orchestration.
 - Release source links.
-- Deterministic HTML output.
+- Deterministic HTML, manifest, gallery, and feed output.
 - Theme resolution, CSS variable emission, and gallery rendering.
 - Local deploy sync, stale cleanup, and verification.
 - Site manifest versioning, determinism, and theme details.
@@ -272,7 +309,7 @@ Typecheck, build, and all tests pass locally.
 CI runs the complete test suite on Ubuntu with Chromium installed.
 The fixture pipeline provides deterministic data for repeatable checks.
 The demo output feeds two verification scripts in CI.
-They check the site manifest and the deployed snapshot.
+They check the site manifest, the RSS feed, and the deployed snapshot.
 
 ## Limitations
 
@@ -280,11 +317,13 @@ They check the site manifest and the deployed snapshot.
 - Public API calls have rate limits without a token.
 - Capture needs a local Chromium installation.
 - Changelog quality depends on releases or conventional commits.
+- Commit-diff windows use commit dates. Release dates set the boundaries.
 - External pages can fail during capture.
 - Capture failures are reported and do not stop publishing.
 - Publishing creates local files. It does not deploy them.
 - Themes offer built-in palettes, selected overrides, and a generated gallery.
 - Local deploy syncs files. It does not push to hosts.
+- The RSS feed uses the configured base URL or the GitHub profile.
 - Scheduled runs upload artifacts. They do not commit generated output.
 
 ## Roadmap
@@ -294,8 +333,9 @@ They check the site manifest and the deployed snapshot.
 | v0.1 | Complete | Fixture demo, GitHub ingest, changelog, capture, publish, and privacy controls. |
 | v0.2 | Complete | Checked-in configuration, coordinated refresh command, and scheduled artifact workflow. |
 | v0.3 | Complete | Built-in themes, theme overrides, theme gallery page, versioned site manifest, and local deploy sync. |
-| v0.4 | Next | Commit-diff summaries and an RSS feed. |
-| v0.5 | Later | Remote deploy adapters and preview diffs. |
+| v0.4 | Complete | Commit-diff summaries, a commit trail on the site, and an RSS feed. |
+| v0.5 | Next | Remote deploy adapters and preview diffs. |
+| v0.6 | Later | Release brief digests and changelog archiving. |
 
 ## License
 

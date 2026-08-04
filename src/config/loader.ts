@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import type { DeployConfig, DeployTarget, PortfolioConfig, PrivacyConfig, ThemeConfig } from "../types.js";
-import { DEFAULT_CONFIG, DEFAULT_DEPLOY, DEFAULT_PRIVACY, DEFAULT_THEME } from "../types.js";
+import type { DeployConfig, DeployTarget, FeedConfig, PortfolioConfig, PrivacyConfig, ThemeConfig } from "../types.js";
+import { DEFAULT_CONFIG, DEFAULT_DEPLOY, DEFAULT_FEED, DEFAULT_PRIVACY, DEFAULT_THEME } from "../types.js";
 import { mergePrivacy } from "../privacy/controls.js";
 import { isBuiltinTheme, isValidHexColor, listBuiltinThemes } from "../theme/palette.js";
 
@@ -128,6 +128,22 @@ function readDeploy(source: ConfigValue): DeployConfig {
   return { targets: parsedTargets };
 }
 
+function readFeed(source: ConfigValue): FeedConfig {
+  if (!("feed" in source)) return DEFAULT_FEED;
+  if (!isConfigValue(source.feed)) {
+    throw new Error('Configuration field "feed" must be an object.');
+  }
+  const feed: FeedConfig = {};
+  if ("baseUrl" in source.feed) {
+    const baseUrl = source.feed.baseUrl;
+    if (typeof baseUrl !== "string" || !/^https?:\/\/.+/i.test(baseUrl.trim())) {
+      throw new Error('Configuration field "feed.baseUrl" must be an absolute http(s) URL.');
+    }
+    feed.baseUrl = baseUrl.trim().replace(/\/+$/, "");
+  }
+  return feed;
+}
+
 export function loadPortfolioConfig(
   path: string = DEFAULT_CONFIG_PATH,
   clock: () => string = DEFAULT_CONFIG.clock
@@ -152,6 +168,7 @@ export function loadPortfolioConfig(
     outputDir: readString(parsed, "outputDir", DEFAULT_CONFIG.outputDir),
     theme: readTheme(parsed),
     deploy: readDeploy(parsed),
+    feed: readFeed(parsed),
     privacy: readPrivacy(parsed),
     clock,
   };

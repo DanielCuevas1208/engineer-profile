@@ -47,7 +47,7 @@ jobs:
       - name: Verify theme catalog
         run: node dist/index.js themes
 
-      - name: Verify site manifest and theme gallery
+      - name: Verify site manifest, commit trail, and RSS feed
         run: node scripts/verify-manifest.mjs
 
       - name: Verify local deploy

@@ -95,6 +95,10 @@ export interface DeployConfig {
   targets: DeployTarget[];
 }
 
+export interface FeedConfig {
+  baseUrl?: string;
+}
+
 export interface PortfolioConfig {
   owner: string;
   title: string;
@@ -104,6 +108,7 @@ export interface PortfolioConfig {
   outputDir: string;
   theme: ThemeConfig;
   deploy: DeployConfig;
+  feed: FeedConfig;
   privacy: PrivacyConfig;
   clock: () => string;
 }
@@ -122,6 +127,8 @@ export const DEFAULT_DEPLOY: DeployConfig = {
   targets: [],
 };
 
+export const DEFAULT_FEED: FeedConfig = {};
+
 export const DEFAULT_CONFIG = {
   owner: "demo-engineer",
   title: "EngineerProfile",
@@ -131,6 +138,7 @@ export const DEFAULT_CONFIG = {
   outputDir: "output",
   theme: DEFAULT_THEME,
   deploy: DEFAULT_DEPLOY,
+  feed: DEFAULT_FEED,
   privacy: DEFAULT_PRIVACY,
   clock: () => new Date().toISOString(),
 } satisfies PortfolioConfig;
