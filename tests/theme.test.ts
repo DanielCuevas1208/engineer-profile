@@ -12,7 +12,7 @@ describe("theme catalog", () => {
   it("exposes deterministic built-in themes", () => {
     const themes = listBuiltinThemes();
     const names = themes.map((theme) => theme.name);
-    expect(names).toEqual(["deep-space", "paper"]);
+    expect(names).toEqual(["deep-space", "paper", "terminal"]);
     for (const theme of themes) {
       expect(theme.description.length).toBeGreaterThan(0);
     }
@@ -21,6 +21,7 @@ describe("theme catalog", () => {
   it("recognizes built-in theme names", () => {
     expect(isBuiltinTheme("deep-space")).toBe(true);
     expect(isBuiltinTheme("paper")).toBe(true);
+    expect(isBuiltinTheme("terminal")).toBe(true);
     expect(isBuiltinTheme("vaporwave")).toBe(false);
   });
 });

@@ -47,16 +47,14 @@ jobs:
       - name: Verify theme catalog
         run: node dist/index.js themes
 
-      - name: Verify site manifest
-        run: node -e '
-            const fs = require("fs");
-            const manifest = JSON.parse(fs.readFileSync("output/site-manifest.json", "utf8"));
-            if (manifest.formatVersion !== 1) process.exit(1);
-            if (typeof manifest.projectCount !== "number") process.exit(1);
-            if (manifest.projectCount !== 2) process.exit(1);
-            if (!manifest.files.includes("index.html")) process.exit(1);
-            console.log("Manifest ok: " + manifest.projectCount + " projects, theme " + manifest.theme);
-          '
+      - name: Verify site manifest and theme gallery
+        run: node scripts/verify-manifest.mjs
+
+      - name: Verify local deploy
+        run: node dist/index.js deploy
+
+      - name: Check deployed snapshot
+        run: node scripts/verify-deploy.mjs
 
       - name: Store demo output
         if: success()

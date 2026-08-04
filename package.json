@@ -18,6 +18,7 @@
     "ingest": "npm run build && node dist/index.js ingest",
     "publish": "npm run build && node dist/index.js publish",
     "capture": "npm run build && node dist/index.js capture",
+    "gallery": "npm run build && node dist/index.js themes --preview",
     "refresh": "npm run build && node dist/index.js refresh"
   },
   "engines": {

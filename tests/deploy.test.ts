@@ -50,8 +50,34 @@ describe("deploy adapters", () => {
     expect(result[0].targetName).toBe("public");
     expect(result[0].targetPath).toBe(TEST_TARGET);
     expect(result[0].files).toBeGreaterThanOrEqual(2);
+    expect(result[0].removed).toBe(0);
+    expect(result[0].verified).toBe(true);
     expect(existsSync(join(TEST_TARGET, "index.html"))).toBe(true);
     expect(existsSync(join(TEST_TARGET, "site-manifest.json"))).toBe(true);
+  });
+
+  it("removes stale files that are not part of the snapshot", () => {
+    writePublishedSite();
+    mkdirSync(join(TEST_TARGET, "assets"), { recursive: true });
+    writeFileSync(join(TEST_TARGET, "old-capture.png"), "stale", "utf-8");
+    const config = publishedConfig();
+
+    const result = deployAll(config);
+
+    expect(result[0].removed).toBe(1);
+    expect(existsSync(join(TEST_TARGET, "old-capture.png"))).toBe(false);
+    expect(existsSync(join(TEST_TARGET, "index.html"))).toBe(true);
+  });
+
+  it("reports an unverified result when the manifest is missing", () => {
+    mkdirSync(TEST_OUTPUT, { recursive: true });
+    writeFileSync(join(TEST_OUTPUT, "index.html"), "<html>partial</html>", "utf-8");
+    const config = publishedConfig();
+
+    const result = deployAll(config);
+
+    expect(result[0].verified).toBe(false);
+    expect(result[0].files).toBe(1);
   });
 
   it("reports a publish-first error when output is missing", () => {

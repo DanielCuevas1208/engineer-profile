@@ -8,6 +8,15 @@
   "theme": {
     "name": "deep-space"
   },
+  "deploy": {
+    "targets": [
+      {
+        "name": "public",
+        "type": "local",
+        "target": "deploy/public"
+      }
+    ]
+  },
   "privacy": {
     "hiddenProjects": [],
     "redactEmails": true,

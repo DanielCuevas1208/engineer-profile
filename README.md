@@ -12,7 +12,9 @@ paths in SQLite. It publishes a static site from these records.
 - Capture repeatable project previews with Playwright.
 - Hide projects and redact author emails before publication.
 - Choose a built-in theme and override accent, radius, and font.
+- Compare every theme in a generated gallery page.
 - Deploy the snapshot to configured local targets.
+- Sync targets and remove stale files before verification.
 - Record a machine-readable manifest with every publish.
 - Run one configured refresh from a scheduled workflow.
 
@@ -43,15 +45,15 @@ flowchart LR
 | --- | --- |
 | `engineer-profile.config.json` | Store owner, presentation, refresh, theme, deploy, and privacy settings. |
 | `src/config/` | Validate checked-in JSON and merge safe defaults. |
-| `src/theme/` | Resolve built-in themes and emit CSS variables. |
+| `src/theme/` | Resolve built-in themes, emit CSS variables, and render a theme gallery. |
 | `src/refresh/` | Coordinate ingest, best-effort capture, static publishing, and deploy. |
 | `src/ingest/` | Fetch public GitHub data and map it to records. |
 | `src/db/` | Store projects, commits, changelogs, and audit events. |
 | `src/changelog/` | Prefer release notes and fall back to commit groups. |
 | `src/privacy/` | Hide projects and block sensitive commit messages. |
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
-| `src/publish/` | Render HTML, changelog files, the site manifest, and preview assets. |
-| `src/deploy/` | Copy published output to configured local targets. |
+| `src/publish/` | Render HTML, changelog files, the theme gallery, the site manifest, and preview assets. |
+| `src/deploy/` | Sync published output to local targets and verify the snapshot. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
 The refresh command runs each stage in a fixed order.
@@ -68,6 +70,7 @@ npm run demo
 ```
 
 Open `output/index.html` in a browser.
+Open `output/theme-gallery.html` to compare the built-in themes.
 
 The demo creates a local SQLite database under `data/`.
 It writes the static site under `output/`.
@@ -104,12 +107,21 @@ Set the theme with a name from the built-in catalog.
 All overrides are optional.
 
 Run `node dist/index.js themes` to list the catalog.
+The catalog contains `deep-space`, `paper`, and `terminal`.
 The loader rejects unknown theme names and invalid accent colors.
+
+Run `node dist/index.js themes --preview` to write a theme gallery page.
+The page renders every theme with its real tokens.
+It includes a `configured` card for your overrides.
+Every published snapshot also contains `theme-gallery.html`.
 
 ### Deploy
 
-Deploy copies the published output to one or more local targets.
+Deploy syncs the published output to one or more local targets.
 A target must live outside the output directory.
+Sync removes files that are no longer part of the snapshot.
+It copies the snapshot, then verifies the key output files.
+Each deploy records an audit entry with the file counts.
 
 ```json
 {
@@ -127,7 +139,7 @@ A target must live outside the output directory.
 
 The refresh command deploys configured targets after publishing.
 Run `node dist/index.js deploy` to publish and deploy in one step.
-Each deploy records an audit entry.
+The command reports the file count, the removed stale count, and the verification state.
 
 Run a network-backed refresh with the checked-in settings:
 
@@ -161,14 +173,19 @@ Captured demo-engineer-signal-router.
 Captured demo-engineer-metrics-kit.
 Published 2 projects to output/index.html.
 Copied 2 available preview screenshots.
+Wrote theme gallery to output/theme-gallery.html.
 Open output/index.html in a browser.
 ```
+
+![Demo output](docs/demo-index.png)
+
+![Theme gallery](docs/theme-gallery.png)
 
 The site shows project facts, source links, changelog previews, and screenshots.
 The totals come from fixture fields and stored commit records.
 
 The demo also writes `output/site-manifest.json`.
-The manifest records the theme, project list, and generated files.
+The manifest records the theme details, project list, and generated files.
 
 ## Commands
 
@@ -181,9 +198,11 @@ Build before direct CLI commands.
 | `npm run ingest -- --fixture` | Load fixture records only. |
 | `npm run capture -- --fixture` | Capture local fixture pages. |
 | `npm run publish` | Rebuild the site from SQLite. |
+| `npm run gallery` | Build and write the theme gallery page. |
 | `npm run refresh` | Run configured ingest, capture, publish, and deploy stages. |
-| `node dist/index.js deploy` | Publish the snapshot and copy it to configured targets. |
+| `node dist/index.js deploy` | Publish the snapshot and sync it to configured targets. |
 | `node dist/index.js themes` | List built-in presentation themes. |
+| `node dist/index.js themes --preview` | Write a theme gallery HTML page. |
 | `node dist/index.js status` | Show visibility and recent operations. |
 | `npm test` | Run deterministic unit and integration tests. |
 | `npm run typecheck` | Validate TypeScript types. |
@@ -214,12 +233,12 @@ The site displays visible projects only.
 It links project cards to repositories.
 It links release notes to their release pages.
 It records local operations in an audit table.
-Deploy operations keep their target name in the audit trail.
+Deploy operations keep their target name and verification state in the audit trail.
 
 ## CI and test status
 
 The regular CI workflow runs typecheck, build, tests, the fixture demo, theme
-verification, manifest verification, and artifact upload.
+verification, manifest verification, local deploy verification, and artifact upload.
 The scheduled refresh workflow runs each Monday and supports manual dispatch.
 It uploads the generated site as a workflow artifact.
 
@@ -234,9 +253,9 @@ The test suite covers these core behaviors:
 - Configured refresh orchestration.
 - Release source links.
 - Deterministic HTML output.
-- Theme resolution and CSS variable emission.
-- Local deploy adapters and audit logging.
-- Site manifest versioning and determinism.
+- Theme resolution, CSS variable emission, and gallery rendering.
+- Local deploy sync, stale cleanup, and verification.
+- Site manifest versioning, determinism, and theme details.
 - Playwright screenshot capture.
 
 Run the local checks:
@@ -249,9 +268,11 @@ npm test
 
 ### Validation status
 
-Typecheck and build pass locally.
+Typecheck, build, and all tests pass locally.
 CI runs the complete test suite on Ubuntu with Chromium installed.
 The fixture pipeline provides deterministic data for repeatable checks.
+The demo output feeds two verification scripts in CI.
+They check the site manifest and the deployed snapshot.
 
 ## Limitations
 
@@ -262,8 +283,8 @@ The fixture pipeline provides deterministic data for repeatable checks.
 - External pages can fail during capture.
 - Capture failures are reported and do not stop publishing.
 - Publishing creates local files. It does not deploy them.
-- Themes offer built-in palettes and selected overrides.
-- Local deploy copies files. It does not push to hosts.
+- Themes offer built-in palettes, selected overrides, and a generated gallery.
+- Local deploy syncs files. It does not push to hosts.
 - Scheduled runs upload artifacts. They do not commit generated output.
 
 ## Roadmap
@@ -272,7 +293,7 @@ The fixture pipeline provides deterministic data for repeatable checks.
 | --- | --- | --- |
 | v0.1 | Complete | Fixture demo, GitHub ingest, changelog, capture, publish, and privacy controls. |
 | v0.2 | Complete | Checked-in configuration, coordinated refresh command, and scheduled artifact workflow. |
-| v0.3 | Complete | Built-in themes, theme overrides, site manifest, and local deploy adapters. |
+| v0.3 | Complete | Built-in themes, theme overrides, theme gallery page, versioned site manifest, and local deploy sync. |
 | v0.4 | Next | Commit-diff summaries and an RSS feed. |
 | v0.5 | Later | Remote deploy adapters and preview diffs. |
 

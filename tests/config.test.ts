@@ -59,7 +59,7 @@ describe("portfolio configuration", () => {
     writeFileSync(TEST_FILE, JSON.stringify({ theme: { name: "vaporwave" } }));
 
     expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
-      'Configuration field "theme.name" must be one of: deep-space, paper.'
+      'Configuration field "theme.name" must be one of: deep-space, paper, terminal.'
     );
   });
 

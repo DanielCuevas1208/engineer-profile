@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { Command } from "commander";
 import { ingestOwnerRepos, ingestRepository } from "./ingest/orchestrator.js";
 import { captureAllProjects, captureLocalHtml, closeBrowser } from "./preview/capture.js";
@@ -11,6 +11,7 @@ import { DEFAULT_CONFIG, type PortfolioConfig } from "./types.js";
 import { DEFAULT_CONFIG_PATH, loadPortfolioConfig } from "./config/loader.js";
 import { refreshPortfolio } from "./refresh/run.js";
 import { listBuiltinThemes } from "./theme/palette.js";
+import { builtinGalleryThemes, renderThemeGallery } from "./theme/gallery.js";
 import { deployAll } from "./deploy/index.js";
 
 const program = new Command();
@@ -69,6 +70,7 @@ addConfigOption(program
     const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Wrote theme gallery to ${result.galleryPath}.`);
     console.log("Open output/index.html in a browser.");
   }));
 
@@ -152,15 +154,31 @@ addConfigOption(program
       console.warn(`Skipped ${error.slug}: ${error.message}`);
     }
     for (const deployed of result.deployed) {
-      console.log(`Deployed ${deployed.targetName}: ${deployed.files} files to ${deployed.targetPath}.`);
+      const state = deployed.verified ? "verified" : "unverified";
+      console.log(`Deployed ${deployed.targetName}: ${deployed.files} files to ${deployed.targetPath} (${state}).`);
+      if (deployed.removed > 0) {
+        console.log(`Removed ${deployed.removed} stale files from ${deployed.targetName}.`);
+      }
     }
   }));
 
 program
   .command("themes")
-  .description("List built-in presentation themes")
-  .action(() => {
+  .description("List built-in presentation themes or write a preview gallery")
+  .option("-p, --preview [file]", "Write a theme gallery HTML page")
+  .action((options) => {
     const themes = listBuiltinThemes();
+    if (options.preview) {
+      const config = existsSync(DEFAULT_CONFIG_PATH)
+        ? loadPortfolioConfig(DEFAULT_CONFIG_PATH)
+        : DEFAULT_CONFIG;
+      const entries = [...builtinGalleryThemes(), { label: "configured", theme: config.theme }];
+      const targetPath = options.preview === true ? join("output", "theme-gallery.html") : options.preview;
+      mkdirSync(dirname(targetPath), { recursive: true });
+      writeFileSync(targetPath, renderThemeGallery(entries), "utf-8");
+      console.log(`Wrote theme gallery with ${entries.length} themes to ${targetPath}.`);
+      return;
+    }
     console.log(`Built-in themes: ${themes.length}`);
     for (const theme of themes) {
       console.log(`  ${theme.name}: ${theme.description}`);
@@ -184,7 +202,11 @@ addConfigOption(program
       console.log('No deploy targets configured. Add a "deploy.targets" entry to the configuration.');
     }
     for (const deployed of results) {
-      console.log(`Deployed ${deployed.targetName}: ${deployed.files} files to ${deployed.targetPath}.`);
+      const state = deployed.verified ? "verified" : "unverified";
+      console.log(`Deployed ${deployed.targetName}: ${deployed.files} files to ${deployed.targetPath} (${state}).`);
+      if (deployed.removed > 0) {
+        console.log(`Removed ${deployed.removed} stale files from ${deployed.targetName}.`);
+      }
     }
   }));
 

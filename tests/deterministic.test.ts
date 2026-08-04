@@ -26,14 +26,17 @@ describe("deterministic publishing", () => {
   it("produces the same HTML for the same fixture snapshot", async () => {
     const fixtures = loadAllFixtures();
     const html = [];
+    const galleries = [];
     for (let index = 0; index < RUNS.length; index++) {
       const config = fixedConfig(RUNS[index], OUTPUTS[index]);
       await ingestOwnerRepos(config, config.owner, fixtures.length, fixtures);
       const result = publishSite(config);
       html.push(readFileSync(result.indexPath, "utf-8"));
+      galleries.push(readFileSync(result.galleryPath, "utf-8"));
     }
 
     expect(html[0]).toBe(html[1]);
+    expect(galleries[0]).toBe(galleries[1]);
     expect(html[0]).toContain("2026-07-31 00:00:00 UTC");
   });
 

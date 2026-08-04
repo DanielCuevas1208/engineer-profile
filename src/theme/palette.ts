@@ -102,11 +102,42 @@ const BUILTIN_PALETTES: Record<string, BuiltinPalette> = {
     radius: "16px",
     font: SHARED_FONT,
   },
+  terminal: {
+    mode: "dark",
+    ink: "#0a0f0b",
+    inkSoft: "#0e1611",
+    panel: "#111b13",
+    panelStrong: "#182519",
+    line: "rgba(126, 217, 160, 0.16)",
+    lineSoft: "rgba(126, 217, 160, 0.08)",
+    text: "#d7ffe7",
+    muted: "#7f9f8b",
+    blue: "#7ee9a0",
+    blueSoft: "#b8ffcf",
+    buttonText: "#0a0f0b",
+    mint: "#a7f3d0",
+    orange: "#ffd166",
+    shadow: "0 24px 60px rgba(0, 0, 0, 0.3)",
+    visual: "#0b120c",
+    glow: "radial-gradient(circle at 82% -10%, rgba(126, 233, 160, 0.14), transparent 34rem)",
+    panelGradient: "linear-gradient(135deg, rgba(24, 37, 25, 0.98), rgba(14, 22, 17, 0.96))",
+    asideGradient: "linear-gradient(145deg, rgba(24, 37, 25, 0.92), rgba(14, 22, 17, 0.72))",
+    labelBg: "rgba(10, 15, 11, 0.78)",
+    labelBorder: "rgba(215, 255, 231, 0.18)",
+    auditBg: "rgba(17, 27, 19, 0.72)",
+    codeBg: "rgba(167, 243, 208, 0.09)",
+    tagBg: "rgba(167, 243, 208, 0.07)",
+    tagBorder: "rgba(167, 243, 208, 0.26)",
+    stripe: "rgba(126, 233, 160, 0.05)",
+    radius: "8px",
+    font: 'ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace',
+  },
 };
 
 const BUILTIN_DESCRIPTIONS: Record<string, string> = {
   "deep-space": "Dark palette with blue accents. Default.",
   paper: "Light palette with dark text and strong contrast.",
+  terminal: "Dark green-on-black palette with monospace type.",
 };
 
 export interface ThemeCatalogEntry {
@@ -200,35 +231,41 @@ export function resolveTheme(config?: ThemeConfig): ThemeTokens {
   return tokens;
 }
 
+export function themePropertyDeclarations(tokens: ThemeTokens): string {
+  return [
+    `color-scheme: ${tokens.mode};`,
+    `--ink: ${tokens.ink};`,
+    `--ink-soft: ${tokens.inkSoft};`,
+    `--panel: ${tokens.panel};`,
+    `--panel-strong: ${tokens.panelStrong};`,
+    `--line: ${tokens.line};`,
+    `--line-soft: ${tokens.lineSoft};`,
+    `--text: ${tokens.text};`,
+    `--muted: ${tokens.muted};`,
+    `--blue: ${tokens.blue};`,
+    `--blue-soft: ${tokens.blueSoft};`,
+    `--button-text: ${tokens.buttonText};`,
+    `--mint: ${tokens.mint};`,
+    `--orange: ${tokens.orange};`,
+    `--shadow: ${tokens.shadow};`,
+    `--visual: ${tokens.visual};`,
+    `--glow: ${tokens.glow};`,
+    `--panel-gradient: ${tokens.panelGradient};`,
+    `--aside-gradient: ${tokens.asideGradient};`,
+    `--label-bg: ${tokens.labelBg};`,
+    `--label-border: ${tokens.labelBorder};`,
+    `--audit-bg: ${tokens.auditBg};`,
+    `--code-bg: ${tokens.codeBg};`,
+    `--tag-bg: ${tokens.tagBg};`,
+    `--tag-border: ${tokens.tagBorder};`,
+    `--stripe: ${tokens.stripe};`,
+    `--radius: ${tokens.radius};`,
+    `--font: ${tokens.font};`,
+  ].join("\n  ");
+}
+
 export function themeVariables(tokens: ThemeTokens): string {
   return `:root {
-  color-scheme: ${tokens.mode};
-  --ink: ${tokens.ink};
-  --ink-soft: ${tokens.inkSoft};
-  --panel: ${tokens.panel};
-  --panel-strong: ${tokens.panelStrong};
-  --line: ${tokens.line};
-  --line-soft: ${tokens.lineSoft};
-  --text: ${tokens.text};
-  --muted: ${tokens.muted};
-  --blue: ${tokens.blue};
-  --blue-soft: ${tokens.blueSoft};
-  --button-text: ${tokens.buttonText};
-  --mint: ${tokens.mint};
-  --orange: ${tokens.orange};
-  --shadow: ${tokens.shadow};
-  --visual: ${tokens.visual};
-  --glow: ${tokens.glow};
-  --panel-gradient: ${tokens.panelGradient};
-  --aside-gradient: ${tokens.asideGradient};
-  --label-bg: ${tokens.labelBg};
-  --label-border: ${tokens.labelBorder};
-  --audit-bg: ${tokens.auditBg};
-  --code-bg: ${tokens.codeBg};
-  --tag-bg: ${tokens.tagBg};
-  --tag-border: ${tokens.tagBorder};
-  --stripe: ${tokens.stripe};
-  --radius: ${tokens.radius};
-  --font: ${tokens.font};
+  ${themePropertyDeclarations(tokens)}
 }`;
 }

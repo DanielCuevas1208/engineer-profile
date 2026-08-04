@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { formatChangelogMarkdown } from "../changelog/generator.js";
 import { openDatabase } from "../db/client.js";
 import { resolveTheme, themeVariables, type ThemeTokens } from "../theme/palette.js";
+import { builtinGalleryThemes, renderThemeGallery } from "../theme/gallery.js";
 import type { ChangelogEntry, PortfolioConfig, ProjectRecord } from "../types.js";
 
 function escapeHtml(text: string): string {
@@ -233,11 +234,17 @@ export interface SiteManifestProject {
 }
 
 export interface SiteManifest {
-  formatVersion: 1;
+  formatVersion: 2;
   generatedAt: string;
   title: string;
   owner: string;
-  theme: string;
+  theme: {
+    name: string;
+    mode: string;
+    accent: string;
+    radius: string;
+    font: string;
+  };
   projectCount: number;
   projects: SiteManifestProject[];
   files: string[];
@@ -247,6 +254,7 @@ export interface SiteManifest {
 export interface PublishResult {
   indexPath: string;
   manifestPath: string;
+  galleryPath: string;
   projectCount: number;
   generatedAt: string;
   theme: string;
@@ -369,13 +377,27 @@ export function publishSite(config: PortfolioConfig): PublishResult {
     }
 
     copyScreenshotsToOutput(config);
+
+    const galleryPath = join(config.outputDir, "theme-gallery.html");
+    const galleryEntries = [
+      ...builtinGalleryThemes(),
+      { label: "configured", theme: config.theme },
+    ];
+    writeFileSync(galleryPath, renderThemeGallery(galleryEntries), "utf-8");
+
     const publishedFiles = relativePosixPaths(config.outputDir);
     const manifest: SiteManifest = {
-      formatVersion: 1,
+      formatVersion: 2,
       generatedAt,
       title: config.title,
       owner: config.owner,
-      theme: theme.name,
+      theme: {
+        name: theme.name,
+        mode: theme.mode,
+        accent: theme.blue,
+        radius: theme.radius,
+        font: theme.font,
+      },
       projectCount: projects.length,
       projects: views.map((view) => ({
         slug: view.project.slug,
@@ -393,6 +415,7 @@ export function publishSite(config: PortfolioConfig): PublishResult {
     return {
       indexPath,
       manifestPath,
+      galleryPath,
       projectCount: projects.length,
       generatedAt,
       theme: theme.name,

@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { openDatabase } from "../db/client.js";
 import type { DeployTarget, PortfolioConfig } from "../types.js";
@@ -7,6 +7,8 @@ export interface DeployResult {
   targetName: string;
   targetPath: string;
   files: number;
+  removed: number;
+  verified: boolean;
 }
 
 function isPathInside(parent: string, child: string): boolean {
@@ -14,19 +16,20 @@ function isPathInside(parent: string, child: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-function countFiles(targetPath: string): number {
-  let total = 0;
-  const walk = (current: string): void => {
+function listFilesRecursive(root: string): string[] {
+  const files: string[] = [];
+  const walk = (current: string, prefix: string): void => {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
-        walk(join(current, entry.name));
+        walk(join(current, entry.name), relative);
       } else {
-        total++;
+        files.push(relative);
       }
     }
   };
-  walk(targetPath);
-  return total;
+  walk(root, "");
+  return files;
 }
 
 export function deployLocal(
@@ -47,15 +50,29 @@ export function deployLocal(
   }
 
   mkdirSync(target.target, { recursive: true });
-  cpSync(config.outputDir, target.target, { recursive: true });
-  const files = countFiles(target.target);
+  const outputFiles = listFilesRecursive(outputRoot);
+  const existingFiles = listFilesRecursive(targetRoot);
+
+  let removed = 0;
+  for (const relative of existingFiles) {
+    if (outputFiles.includes(relative)) continue;
+    rmSync(join(targetRoot, relative), { force: true });
+    removed++;
+  }
+
+  cpSync(config.outputDir, target.target, { recursive: true, force: true });
+  const files = listFilesRecursive(targetRoot).length;
+  const verified =
+    existsSync(join(targetRoot, "index.html")) &&
+    existsSync(join(targetRoot, "site-manifest.json"));
 
   const db = openDatabase(config.dataDir, config.clock);
   try {
-    db.logIngest("deploy", `${target.name} -> ${target.target}`);
+    const detail = `${target.name} -> ${target.target} (${files} files, ${removed} removed, ${verified ? "verified" : "unverified"})`;
+    db.logIngest("deploy", detail);
   } finally {
     db.close();
   }
 
-  return { targetName: target.name, targetPath: target.target, files };
+  return { targetName: target.name, targetPath: target.target, files, removed, verified };
 }
