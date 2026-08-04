@@ -1,0 +1,15 @@
+{
+  "formatVersion": 1,
+  "generatedAt": "2026-08-04T01:48:03.519Z",
+  "owner": "DanielCuevas1208",
+  "theme": "deep-space",
+  "projectCount": 2,
+  "files": [
+    "assets/screenshots/demo-engineer-metrics-kit.png",
+    "assets/screenshots/demo-engineer-signal-router.png",
+    "demo-engineer-metrics-kit-changelog.md",
+    "demo-engineer-signal-router-changelog.md",
+    "index.html",
+    "site-manifest.json"
+  ]
+}
