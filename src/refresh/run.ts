@@ -1,6 +1,7 @@
 import { ingestOwnerRepos } from "../ingest/orchestrator.js";
 import { captureAllProjects } from "../preview/capture.js";
 import { copyScreenshotsToOutput, publishSite, type PublishResult } from "../publish/site.js";
+import { deployAll, type DeployResult } from "../deploy/index.js";
 import type { FixtureData } from "../ingest/orchestrator.js";
 import { DEFAULT_CONFIG, type PortfolioConfig } from "../types.js";
 
@@ -14,6 +15,7 @@ export interface RefreshResult {
   captured: number;
   copiedScreenshots: number;
   captureErrors: Array<{ slug: string; message: string }>;
+  deployed: DeployResult[];
   published: PublishResult;
 }
 
@@ -36,12 +38,15 @@ export async function refreshPortfolio(
         (slug, error) => captureErrors.push({ slug, message: error.message })
       );
   const published = publishSite(config);
+  const copiedScreenshots = copyScreenshotsToOutput(config);
+  const deployed = deployAll(config);
 
   return {
     ingested: ingested.length,
     captured: captured.length,
-    copiedScreenshots: copyScreenshotsToOutput(config),
+    copiedScreenshots,
     captureErrors,
+    deployed,
     published,
   };
 }

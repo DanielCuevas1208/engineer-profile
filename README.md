@@ -11,6 +11,9 @@ paths in SQLite. It publishes a static site from these records.
 - Build release notes from releases or conventional commits.
 - Capture repeatable project previews with Playwright.
 - Hide projects and redact author emails before publication.
+- Choose a built-in theme and override accent, radius, and font.
+- Deploy the snapshot to configured local targets.
+- Record a machine-readable manifest with every publish.
 - Run one configured refresh from a scheduled workflow.
 
 The fixture demo runs without secrets and without network access.
@@ -31,19 +34,24 @@ flowchart LR
   P --> W
   S --> W
   W --> O[Static output]
+  T[Theme] --> W
+  W --> M[Manifest]
+  M --> K[Deploy]
 ```
 
 | Area | Responsibility |
 | --- | --- |
-| `engineer-profile.config.json` | Store owner, presentation, refresh, paths, and privacy settings. |
+| `engineer-profile.config.json` | Store owner, presentation, refresh, theme, deploy, and privacy settings. |
 | `src/config/` | Validate checked-in JSON and merge safe defaults. |
-| `src/refresh/` | Coordinate ingest, best-effort capture, and static publishing. |
+| `src/theme/` | Resolve built-in themes and emit CSS variables. |
+| `src/refresh/` | Coordinate ingest, best-effort capture, static publishing, and deploy. |
 | `src/ingest/` | Fetch public GitHub data and map it to records. |
 | `src/db/` | Store projects, commits, changelogs, and audit events. |
 | `src/changelog/` | Prefer release notes and fall back to commit groups. |
 | `src/privacy/` | Hide projects and block sensitive commit messages. |
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
-| `src/publish/` | Render HTML, changelog files, and preview assets. |
+| `src/publish/` | Render HTML, changelog files, the site manifest, and preview assets. |
+| `src/deploy/` | Copy published output to configured local targets. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
 The refresh command runs each stage in a fixed order.
@@ -68,11 +76,58 @@ Both directories are ignored by Git.
 ## Configuration
 
 `engineer-profile.config.json` is the checked-in source for scheduled refreshes.
-It sets the GitHub owner, site presentation, repository limit, paths, and privacy controls.
+It sets the GitHub owner, site presentation, repository limit, paths, theme, deploy, and privacy controls.
 
 The loader accepts repository limits from 1 through 100.
 It rejects malformed values before network access.
 CLI `--config`, `--data`, and `--output` options override file values.
+
+### Theme
+
+Set the theme with a name from the built-in catalog.
+
+```json
+{
+  "theme": {
+    "name": "deep-space",
+    "accent": "#67b7ff",
+    "radius": "16px",
+    "font": "Inter, system-ui, sans-serif"
+  }
+}
+```
+
+`name` selects a built-in theme.
+`accent` sets the primary color.
+`radius` sets the corner radius.
+`font` sets the base font stack.
+All overrides are optional.
+
+Run `node dist/index.js themes` to list the catalog.
+The loader rejects unknown theme names and invalid accent colors.
+
+### Deploy
+
+Deploy copies the published output to one or more local targets.
+A target must live outside the output directory.
+
+```json
+{
+  "deploy": {
+    "targets": [
+      {
+        "name": "public",
+        "type": "local",
+        "target": "deploy/public"
+      }
+    ]
+  }
+}
+```
+
+The refresh command deploys configured targets after publishing.
+Run `node dist/index.js deploy` to publish and deploy in one step.
+Each deploy records an audit entry.
 
 Run a network-backed refresh with the checked-in settings:
 
@@ -81,7 +136,7 @@ npm run refresh
 ```
 
 The refresh command reads public repositories, captures previews, publishes HTML,
-and reports skipped captures.
+deploys configured targets, and reports skipped captures.
 
 GitHub ingestion uses the public API.
 Set `GITHUB_TOKEN` for a higher rate limit.
@@ -112,6 +167,9 @@ Open output/index.html in a browser.
 The site shows project facts, source links, changelog previews, and screenshots.
 The totals come from fixture fields and stored commit records.
 
+The demo also writes `output/site-manifest.json`.
+The manifest records the theme, project list, and generated files.
+
 ## Commands
 
 Build before direct CLI commands.
@@ -123,7 +181,9 @@ Build before direct CLI commands.
 | `npm run ingest -- --fixture` | Load fixture records only. |
 | `npm run capture -- --fixture` | Capture local fixture pages. |
 | `npm run publish` | Rebuild the site from SQLite. |
-| `npm run refresh` | Run configured ingest, capture, and publish stages. |
+| `npm run refresh` | Run configured ingest, capture, publish, and deploy stages. |
+| `node dist/index.js deploy` | Publish the snapshot and copy it to configured targets. |
+| `node dist/index.js themes` | List built-in presentation themes. |
 | `node dist/index.js status` | Show visibility and recent operations. |
 | `npm test` | Run deterministic unit and integration tests. |
 | `npm run typecheck` | Validate TypeScript types. |
@@ -154,10 +214,12 @@ The site displays visible projects only.
 It links project cards to repositories.
 It links release notes to their release pages.
 It records local operations in an audit table.
+Deploy operations keep their target name in the audit trail.
 
 ## CI and test status
 
-The regular CI workflow runs typecheck, build, tests, the fixture demo, and artifact upload.
+The regular CI workflow runs typecheck, build, tests, the fixture demo, theme
+verification, manifest verification, and artifact upload.
 The scheduled refresh workflow runs each Monday and supports manual dispatch.
 It uploads the generated site as a workflow artifact.
 
@@ -172,6 +234,9 @@ The test suite covers these core behaviors:
 - Configured refresh orchestration.
 - Release source links.
 - Deterministic HTML output.
+- Theme resolution and CSS variable emission.
+- Local deploy adapters and audit logging.
+- Site manifest versioning and determinism.
 - Playwright screenshot capture.
 
 Run the local checks:
@@ -197,6 +262,8 @@ The fixture pipeline provides deterministic data for repeatable checks.
 - External pages can fail during capture.
 - Capture failures are reported and do not stop publishing.
 - Publishing creates local files. It does not deploy them.
+- Themes offer built-in palettes and selected overrides.
+- Local deploy copies files. It does not push to hosts.
 - Scheduled runs upload artifacts. They do not commit generated output.
 
 ## Roadmap
@@ -205,8 +272,9 @@ The fixture pipeline provides deterministic data for repeatable checks.
 | --- | --- | --- |
 | v0.1 | Complete | Fixture demo, GitHub ingest, changelog, capture, publish, and privacy controls. |
 | v0.2 | Complete | Checked-in configuration, coordinated refresh command, and scheduled artifact workflow. |
-| v0.3 | Next | Custom themes and deployment adapters. |
-| v0.4 | Later | Commit-diff summaries and an RSS feed. |
+| v0.3 | Complete | Built-in themes, theme overrides, site manifest, and local deploy adapters. |
+| v0.4 | Next | Commit-diff summaries and an RSS feed. |
+| v0.5 | Later | Remote deploy adapters and preview diffs. |
 
 ## License
 

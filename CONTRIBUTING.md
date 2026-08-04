@@ -14,6 +14,8 @@ npm test
 
 Use fixtures for changes that need repeatable data.
 Do not add credentials, private repository data, or generated output.
+Run `node dist/index.js themes` after theme changes.
+Verify `output/site-manifest.json` after publish changes.
 
 ## Pull requests
 

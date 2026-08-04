@@ -78,6 +78,23 @@ export interface PrivacyConfig {
   maxCommitsPerProject: number;
 }
 
+export interface ThemeConfig {
+  name: string;
+  accent?: string;
+  radius?: string;
+  font?: string;
+}
+
+export interface DeployTarget {
+  name: string;
+  type: "local";
+  target: string;
+}
+
+export interface DeployConfig {
+  targets: DeployTarget[];
+}
+
 export interface PortfolioConfig {
   owner: string;
   title: string;
@@ -85,6 +102,8 @@ export interface PortfolioConfig {
   repositoryLimit?: number;
   dataDir: string;
   outputDir: string;
+  theme: ThemeConfig;
+  deploy: DeployConfig;
   privacy: PrivacyConfig;
   clock: () => string;
 }
@@ -95,6 +114,14 @@ export const DEFAULT_PRIVACY: PrivacyConfig = {
   maxCommitsPerProject: 50,
 };
 
+export const DEFAULT_THEME: ThemeConfig = {
+  name: "deep-space",
+};
+
+export const DEFAULT_DEPLOY: DeployConfig = {
+  targets: [],
+};
+
 export const DEFAULT_CONFIG = {
   owner: "demo-engineer",
   title: "EngineerProfile",
@@ -102,6 +129,8 @@ export const DEFAULT_CONFIG = {
   repositoryLimit: 5,
   dataDir: "data",
   outputDir: "output",
+  theme: DEFAULT_THEME,
+  deploy: DEFAULT_DEPLOY,
   privacy: DEFAULT_PRIVACY,
   clock: () => new Date().toISOString(),
 } satisfies PortfolioConfig;
