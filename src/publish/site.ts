@@ -1,7 +1,8 @@
-import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { formatChangelogMarkdown } from "../changelog/generator.js";
-import { openDatabase } from "../db/client.js";
+import { openDatabase, type PortfolioDatabase } from "../db/client.js";
+import { resolveTheme, themeVariables, type ThemeTokens } from "../theme/palette.js";
 import type { ChangelogEntry, PortfolioConfig, ProjectRecord } from "../types.js";
 
 function escapeHtml(text: string): string {
@@ -124,33 +125,18 @@ function projectCard(
   </article>`;
 }
 
-function siteCss(): string {
+function siteCss(theme: ThemeTokens): string {
   return `
-:root {
-  color-scheme: dark;
-  --ink: #08111f;
-  --ink-soft: #0d1a2d;
-  --panel: #112139;
-  --panel-strong: #172a46;
-  --line: rgba(169, 195, 222, 0.18);
-  --text: #f3f7fb;
-  --muted: #9db0c7;
-  --blue: #67b7ff;
-  --blue-soft: #b8dcff;
-  --mint: #a7f3d0;
-  --orange: #ffb86b;
-  --shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
+${themeVariables(theme)}
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; min-width: 320px; background: var(--ink); color: var(--text); line-height: 1.5; }
+body { margin: 0; min-width: 320px; background: var(--ink); color: var(--text); line-height: 1.5; font-family: var(--font); }
 a { color: inherit; }
-.site-shell { min-height: 100vh; background: radial-gradient(circle at 82% -10%, rgba(70, 148, 232, 0.2), transparent 34rem), var(--ink); }
+.site-shell { min-height: 100vh; background: var(--glow), var(--ink-soft); }
 .container { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
 .site-nav { display: flex; justify-content: space-between; align-items: center; padding: 28px 0; border-bottom: 1px solid var(--line); }
 .brand { display: inline-flex; align-items: center; gap: 12px; font: 700 0.9rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-decoration: none; text-transform: uppercase; }
-.brand-mark { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--blue); color: var(--blue); border-radius: 8px; font-size: 0.72rem; }
+.brand-mark { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--blue); color: var(--blue); border-radius: var(--radius); font-size: 0.72rem; }
 .nav-link { color: var(--muted); font: 0.76rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-decoration: none; text-transform: uppercase; }
 .nav-link:hover, .text-link:hover, h2 a:hover { color: var(--blue); }
 .hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr); gap: 80px; align-items: end; padding: 86px 0 70px; }
@@ -158,7 +144,7 @@ a { color: inherit; }
 .kicker { color: var(--mint); margin: 0 0 22px; }
 h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-weight: 650; letter-spacing: -0.08em; line-height: 0.94; }
 .hero-copy { max-width: 530px; margin: 28px 0 0; color: var(--blue-soft); font-size: 1.12rem; }
-.hero-aside { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(145deg, rgba(23, 42, 70, 0.92), rgba(13, 26, 45, 0.72)); box-shadow: var(--shadow); }
+.hero-aside { padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--aside-gradient); box-shadow: var(--shadow); }
 .aside-index { display: flex; justify-content: space-between; color: var(--orange); font: 0.68rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.12em; text-transform: uppercase; }
 .hero-aside p { margin: 24px 0 4px; color: var(--text); font-size: 1rem; }
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -166,19 +152,19 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 .stat:last-child { border-right: 0; }
 .stat strong { display: block; color: var(--text); font-size: 1.8rem; font-weight: 600; letter-spacing: -0.04em; }
 .stat span { color: var(--muted); font: 0.7rem/1.3 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-transform: uppercase; }
-.audit-panel { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; margin: 26px 0 80px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px; background: rgba(17, 33, 57, 0.66); }
+.audit-panel { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; margin: 26px 0 80px; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--audit-bg); }
 .audit-copy { color: var(--muted); font-size: 0.88rem; }
 .audit-copy strong { color: var(--text); font-weight: 500; }
 .audit-time { color: var(--blue); font: 0.7rem/1.4 "SFMono-Regular", Consolas, monospace; text-align: right; }
 .index-header { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 24px; }
 .index-header h2 { margin: 0; font-size: 2rem; font-weight: 550; letter-spacing: -0.05em; }
 .index-header p { max-width: 350px; margin: 0; color: var(--muted); font-size: 0.88rem; text-align: right; }
-.project-card { display: grid; grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr); overflow: hidden; margin-bottom: 24px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(135deg, rgba(23, 42, 70, 0.98), rgba(13, 26, 45, 0.96)); box-shadow: var(--shadow); }
-.project-visual { position: relative; min-height: 310px; background: #0a1525; }
+.project-card { display: grid; grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr); overflow: hidden; margin-bottom: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-gradient); box-shadow: var(--shadow); }
+.project-visual { position: relative; min-height: 310px; background: var(--visual); }
 .screenshot { display: block; width: 100%; height: 100%; min-height: 310px; object-fit: cover; opacity: 0.9; }
-.placeholder { display: flex; min-height: 310px; align-items: center; justify-content: center; flex-direction: column; gap: 7px; color: var(--blue); background: repeating-linear-gradient(135deg, rgba(103, 183, 255, 0.05), rgba(103, 183, 255, 0.05) 1px, transparent 1px, transparent 14px); }
+.placeholder { display: flex; min-height: 310px; align-items: center; justify-content: center; flex-direction: column; gap: 7px; color: var(--blue); background: repeating-linear-gradient(135deg, var(--stripe), var(--stripe) 1px, transparent 1px, transparent 14px); }
 .placeholder small { color: var(--muted); font: 0.68rem/1 "SFMono-Regular", Consolas, monospace; text-transform: uppercase; }
-.visual-label { position: absolute; right: 16px; bottom: 16px; padding: 7px 9px; border: 1px solid rgba(255,255,255,0.18); border-radius: 5px; background: rgba(8, 17, 31, 0.72); color: var(--blue-soft); }
+.visual-label { position: absolute; right: 16px; bottom: 16px; padding: 7px 9px; border: 1px solid var(--label-border); border-radius: calc(var(--radius) / 2); background: var(--label-bg); color: var(--blue-soft); }
 .project-body { padding: 30px 34px 32px; }
 .card-topline { display: flex; justify-content: space-between; gap: 12px; color: var(--blue); }
 .project-body h2 { margin: 18px 0 8px; font-size: 2.1rem; font-weight: 560; letter-spacing: -0.06em; }
@@ -187,8 +173,8 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 .facts { display: flex; flex-wrap: wrap; gap: 22px; margin: 24px 0 16px; color: var(--muted); font: 0.76rem/1 "SFMono-Regular", Consolas, monospace; }
 .facts strong { color: var(--text); font-size: 1rem; font-weight: 600; }
 .tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 26px; }
-.tag { padding: 5px 9px; border: 1px solid rgba(167, 243, 208, 0.26); border-radius: 999px; color: var(--mint); font: 0.68rem/1 "SFMono-Regular", Consolas, monospace; }
-.change-log { padding: 18px 0 20px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.tag { padding: 5px 9px; border: 1px solid var(--tag-border); border-radius: 999px; color: var(--mint); background: var(--tag-bg); font: 0.68rem/1 "SFMono-Regular", Consolas, monospace; }
+.change-log { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-strong); }
 .section-heading { display: flex; justify-content: space-between; color: var(--orange); }
 .source-badge { color: var(--muted); }
 .change-log h3 { margin: 12px 0 2px; font-size: 1.08rem; font-weight: 550; }
@@ -197,20 +183,20 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 .change-preview h3, .change-preview h4 { margin: 12px 0 4px; color: var(--text); font-size: 0.78rem; font-weight: 600; }
 .change-preview p { margin: 3px 0; }
 .change-preview li { margin: 3px 0 3px 18px; }
-.change-preview code { padding: 2px 4px; border-radius: 3px; color: var(--mint); background: rgba(167, 243, 208, 0.08); font: 0.76rem "SFMono-Regular", Consolas, monospace; }
+.change-preview code { padding: 2px 4px; border-radius: 3px; color: var(--mint); background: var(--code-bg); font: 0.76rem "SFMono-Regular", Consolas, monospace; }
 .text-link { display: inline-block; margin-top: 14px; color: var(--blue); font: 0.73rem/1 "SFMono-Regular", Consolas, monospace; text-decoration: none; text-transform: uppercase; }
 .card-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
-.button { display: inline-block; padding: 10px 14px; border-radius: 7px; font: 0.72rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.04em; text-decoration: none; text-transform: uppercase; }
-.button.primary { background: var(--blue); color: var(--ink); }
+.button { display: inline-block; padding: 10px 14px; border-radius: var(--radius); font: 0.72rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.04em; text-decoration: none; text-transform: uppercase; }
+.button.primary { background: var(--blue); color: var(--button-text); }
 .button.primary:hover { background: var(--blue-soft); }
 .button.secondary { border: 1px solid var(--line); color: var(--text); }
 .button.secondary:hover { border-color: var(--blue); color: var(--blue); }
 .muted { color: var(--muted); }
-.source-trail { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 36px; margin: 80px 0; padding: 26px 0; border-top: 1px solid var(--line); }
+.source-trail { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 36px; margin: 80px 0; padding: 26px 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
 .source-trail h2 { margin: 0 0 8px; font-size: 1.2rem; font-weight: 550; }
 .source-trail p { margin: 0; color: var(--muted); font-size: 0.86rem; }
 .audit-list { margin: 0; padding: 0; list-style: none; }
-.audit-list li { display: grid; grid-template-columns: 150px 72px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(169, 195, 222, 0.1); color: var(--muted); font: 0.72rem/1.4 "SFMono-Regular", Consolas, monospace; }
+.audit-list li { display: grid; grid-template-columns: 150px 72px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); color: var(--muted); font: 0.72rem/1.4 "SFMono-Regular", Consolas, monospace; }
 .audit-list time { color: var(--blue); }
 .audit-list strong { color: var(--orange); font-weight: 500; text-transform: uppercase; }
 .site-footer { display: flex; justify-content: space-between; gap: 20px; padding: 24px 0 40px; border-top: 1px solid var(--line); color: var(--muted); font: 0.7rem/1.4 "SFMono-Regular", Consolas, monospace; }
@@ -239,10 +225,60 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 `;
 }
 
+export interface SiteManifestProject {
+  slug: string;
+  name: string;
+  url: string;
+  changelogFile: string | null;
+}
+
+export interface SiteManifest {
+  formatVersion: 1;
+  generatedAt: string;
+  title: string;
+  owner: string;
+  theme: string;
+  projectCount: number;
+  projects: SiteManifestProject[];
+  files: string[];
+  screenshots: string[];
+}
+
 export interface PublishResult {
   indexPath: string;
+  manifestPath: string;
   projectCount: number;
   generatedAt: string;
+  theme: string;
+}
+
+function relativePosixPaths(outputDir: string): string[] {
+  const paths: string[] = [];
+  const walk = (current: string, prefix: string): void => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        walk(join(current, entry.name), relative);
+      } else {
+        paths.push(relative);
+      }
+    }
+  };
+  walk(outputDir, "");
+  return paths.sort();
+}
+
+function copyScreenshotAssets(config: PortfolioConfig, db: PortfolioDatabase): number {
+  const assetsDir = join(config.outputDir, "assets", "screenshots");
+  mkdirSync(assetsDir, { recursive: true });
+
+  let available = 0;
+  for (const project of db.listProjects(true)) {
+    if (!project.screenshot_path || !existsSync(project.screenshot_path)) continue;
+    cpSync(project.screenshot_path, join(assetsDir, `${project.slug}.png`));
+    available++;
+  }
+  return available;
 }
 
 export function publishSite(config: PortfolioConfig): PublishResult {
@@ -250,6 +286,7 @@ export function publishSite(config: PortfolioConfig): PublishResult {
   try {
     const projects = db.listProjects(true);
     const generatedAt = config.clock();
+    const theme = resolveTheme(config.theme);
     const views = projects.map((project) => ({
       project,
       changelog: db.getChangelog(project.id),
@@ -279,7 +316,7 @@ export function publishSite(config: PortfolioConfig): PublishResult {
   <meta name="description" content="${escapeHtml(config.tagline)}" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'" />
   <title>${escapeHtml(config.title)} / Portfolio</title>
-  <style>${siteCss()}</style>
+  <style>${siteCss(theme)}</style>
 </head>
 <body>
   <div class="site-shell">
@@ -295,7 +332,7 @@ export function publishSite(config: PortfolioConfig): PublishResult {
           <p class="hero-copy">${escapeHtml(config.tagline)}. Each project stays connected to its repository, commits, releases, and preview.</p>
         </div>
         <aside class="hero-aside">
-          <div class="aside-index"><span>Profile / ${escapeHtml(config.owner)}</span><span>Local build</span></div>
+          <div class="aside-index"><span>Profile / ${escapeHtml(config.owner)}</span><span>Theme / ${escapeHtml(theme.name)}</span></div>
           <p>Facts stay close to their sources. Privacy choices stay close to the database.</p>
         </aside>
       </header>
@@ -315,7 +352,7 @@ export function publishSite(config: PortfolioConfig): PublishResult {
         ${cards}
       </main>
       <section class="source-trail" id="source-trail">
-        <div><p class="eyebrow">Audit / 03</p><h2>Refresh trail</h2><p>EngineerProfile records each ingest, capture, and publish operation locally.</p></div>
+        <div><p class="eyebrow">Audit / 03</p><h2>Refresh trail</h2><p>EngineerProfile records each ingest, capture, publish, and deploy operation locally.</p></div>
         <ol class="audit-list">${auditItems}</ol>
       </section>
       <footer class="site-footer"><p>${escapeHtml(config.title)} / local publisher</p><p>Public output contains visible projects only. No invented metrics.</p></footer>
@@ -344,27 +381,46 @@ export function publishSite(config: PortfolioConfig): PublishResult {
       writeFileSync(join(config.outputDir, `${view.project.slug}-changelog.md`), markdown, "utf-8");
     }
 
+    copyScreenshotAssets(config, db);
+
+    const publishedFiles = relativePosixPaths(config.outputDir);
+    const manifest: SiteManifest = {
+      formatVersion: 1,
+      generatedAt,
+      title: config.title,
+      owner: config.owner,
+      theme: theme.name,
+      projectCount: projects.length,
+      projects: views.map((view) => ({
+        slug: view.project.slug,
+        name: view.project.name,
+        url: view.project.url,
+        changelogFile: view.changelog.length > 0 ? `${view.project.slug}-changelog.md` : null,
+      })),
+      files: [...new Set([...publishedFiles, "site-manifest.json"])].sort(),
+      screenshots: publishedFiles.filter((file) => file.startsWith("assets/screenshots/")),
+    };
+    const manifestPath = join(config.outputDir, "site-manifest.json");
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
+
     db.logIngest("publish", `${projects.length} projects -> ${indexPath}`);
-    return { indexPath, projectCount: projects.length, generatedAt };
+    return {
+      indexPath,
+      manifestPath,
+      projectCount: projects.length,
+      generatedAt,
+      theme: theme.name,
+    };
   } finally {
     db.close();
   }
 }
 
 export function copyScreenshotsToOutput(config: PortfolioConfig): number {
-  const assetsDir = join(config.outputDir, "assets", "screenshots");
-  mkdirSync(assetsDir, { recursive: true });
-
   const db = openDatabase(config.dataDir, config.clock);
-  let copied = 0;
   try {
-    for (const project of db.listProjects(true)) {
-      if (!project.screenshot_path || !existsSync(project.screenshot_path)) continue;
-      cpSync(project.screenshot_path, join(assetsDir, `${project.slug}.png`));
-      copied++;
-    }
+    return copyScreenshotAssets(config, db);
   } finally {
     db.close();
   }
-  return copied;
 }

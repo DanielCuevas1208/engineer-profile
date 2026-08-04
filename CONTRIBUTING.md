@@ -15,6 +15,13 @@ npm test
 Use fixtures for changes that need repeatable data.
 Do not add credentials, private repository data, or generated output.
 
+## Feature areas
+
+The theme catalog lives in `src/theme/`.
+Add a palette, then register its description.
+The deploy adapters live in `src/deploy/`.
+Keep the publish, capture, and deploy stages separated.
+
 ## Pull requests
 
 Explain the user value and the data path.

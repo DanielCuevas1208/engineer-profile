@@ -3,6 +3,7 @@
 EngineerProfile builds a local engineering portfolio from public repository data.
 It stores repository metadata, commits, releases, privacy settings, and preview
 paths in SQLite. It publishes a static site from these records.
+Themes and deploy targets control the presentation.
 
 ## Value
 
@@ -10,6 +11,8 @@ paths in SQLite. It publishes a static site from these records.
 - Refresh project cards from public GitHub repositories.
 - Build release notes from releases or conventional commits.
 - Capture repeatable project previews with Playwright.
+- Choose a built-in theme or tune the accent color.
+- Copy the published site to local deploy targets.
 - Hide projects and redact author emails before publication.
 - Run one configured refresh from a scheduled workflow.
 
@@ -30,20 +33,28 @@ flowchart LR
   L --> W[Publisher]
   P --> W
   S --> W
+  T[Theme] --> W
   W --> O[Static output]
+  W --> M[Site manifest]
+  O --> A[Deploy]
+  C --> T
+  C --> A
+  A --> Y[Local targets]
 ```
 
 | Area | Responsibility |
 | --- | --- |
-| `engineer-profile.config.json` | Store owner, presentation, refresh, paths, and privacy settings. |
+| `engineer-profile.config.json` | Store owner, presentation, refresh, paths, theme, deploy, and privacy settings. |
 | `src/config/` | Validate checked-in JSON and merge safe defaults. |
-| `src/refresh/` | Coordinate ingest, best-effort capture, and static publishing. |
+| `src/refresh/` | Coordinate ingest, best-effort capture, static publishing, and deploy. |
 | `src/ingest/` | Fetch public GitHub data and map it to records. |
 | `src/db/` | Store projects, commits, changelogs, and audit events. |
 | `src/changelog/` | Prefer release notes and fall back to commit groups. |
 | `src/privacy/` | Hide projects and block sensitive commit messages. |
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
-| `src/publish/` | Render HTML, changelog files, and preview assets. |
+| `src/theme/` | Resolve built-in themes and emit CSS variables. |
+| `src/publish/` | Render HTML, changelog files, preview assets, and the site manifest. |
+| `src/deploy/` | Copy the published snapshot to configured local targets. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
 The refresh command runs each stage in a fixed order.
@@ -68,7 +79,8 @@ Both directories are ignored by Git.
 ## Configuration
 
 `engineer-profile.config.json` is the checked-in source for scheduled refreshes.
-It sets the GitHub owner, site presentation, repository limit, paths, and privacy controls.
+It sets the GitHub owner, presentation, repository limit, paths, theme, deploy
+targets, and privacy controls.
 
 The loader accepts repository limits from 1 through 100.
 It rejects malformed values before network access.
@@ -81,7 +93,7 @@ npm run refresh
 ```
 
 The refresh command reads public repositories, captures previews, publishes HTML,
-and reports skipped captures.
+copies the site to deploy targets, and reports skipped captures.
 
 GitHub ingestion uses the public API.
 Set `GITHUB_TOKEN` for a higher rate limit.
@@ -93,6 +105,50 @@ npm run refresh
 
 Do not put a token in repository files.
 Use `.env.example` as a variable reference.
+
+## Themes
+
+Choose a theme with the `theme.name` field.
+Built-in themes are `deep-space`, `paper`, and `terminal`.
+The `deep-space` theme is the default.
+Override the accent color, corner radius, or font for any theme.
+
+```json
+{
+  "theme": {
+    "name": "terminal",
+    "accent": "#39d353"
+  }
+}
+```
+
+Run `npm run themes` to list the catalog.
+
+## Deploy targets
+
+Deploy targets copy the published snapshot to local folders.
+Use the `deploy.targets` list in the configuration.
+Each target needs a name, a type, and a target path.
+The `local` type copies the output directory.
+A target must stay outside the output directory.
+The publisher rejects unsafe target paths.
+
+```json
+{
+  "deploy": {
+    "targets": [
+      {
+        "name": "public",
+        "type": "local",
+        "target": "deploy/site"
+      }
+    ]
+  }
+}
+```
+
+Run `npm run deploy` to publish and copy the site.
+Deploy runs automatically at the end of a refresh.
 
 ## Sample output
 
@@ -106,11 +162,13 @@ Captured demo-engineer-signal-router.
 Captured demo-engineer-metrics-kit.
 Published 2 projects to output/index.html.
 Copied 2 available preview screenshots.
+Deployed public: 6 files to deploy/site.
 Open output/index.html in a browser.
 ```
 
 The site shows project facts, source links, changelog previews, and screenshots.
 The totals come from fixture fields and stored commit records.
+The manifest lists the published files and the active theme.
 
 ## Commands
 
@@ -119,11 +177,13 @@ Build before direct CLI commands.
 | Command | Result |
 | --- | --- |
 | `npm run demo` | Run the complete fixture pipeline. |
+| `npm run themes` | List built-in presentation themes. |
 | `npm run ingest -- octocat --limit 3` | Load public repository evidence. |
 | `npm run ingest -- --fixture` | Load fixture records only. |
 | `npm run capture -- --fixture` | Capture local fixture pages. |
 | `npm run publish` | Rebuild the site from SQLite. |
-| `npm run refresh` | Run configured ingest, capture, and publish stages. |
+| `npm run deploy` | Publish the site and copy it to targets. |
+| `npm run refresh` | Run configured ingest, capture, publish, and deploy stages. |
 | `node dist/index.js status` | Show visibility and recent operations. |
 | `npm test` | Run deterministic unit and integration tests. |
 | `npm run typecheck` | Validate TypeScript types. |
@@ -144,6 +204,13 @@ Hidden projects stay out of public HTML and copied assets.
 Author emails are redacted by default.
 Sensitive commit messages are skipped before storage.
 
+## Site manifest
+
+`publish` writes `site-manifest.json` to the output directory.
+The manifest records the theme, the project count, and every published file.
+It lists each project with its changelog file.
+Scripts can use the manifest to verify a build.
+
 ## Audit model
 
 Each project stores a repository URL and its last pushed timestamp.
@@ -153,11 +220,12 @@ Each release keeps its tag, notes, date, and source URL.
 The site displays visible projects only.
 It links project cards to repositories.
 It links release notes to their release pages.
-It records local operations in an audit table.
+It records ingest, capture, publish, and deploy operations in an audit table.
 
 ## CI and test status
 
 The regular CI workflow runs typecheck, build, tests, the fixture demo, and artifact upload.
+It verifies the theme catalog and the site manifest.
 The scheduled refresh workflow runs each Monday and supports manual dispatch.
 It uploads the generated site as a workflow artifact.
 
@@ -168,7 +236,10 @@ The test suite covers these core behaviors:
 - Release-first changelog generation.
 - SQLite upserts and changelog replacement.
 - Privacy filtering and email redaction.
+- Theme resolution and CSS variable output.
+- Local deploy adapter safety checks.
 - Fixture ingestion and static publishing.
+- Site manifest accuracy.
 - Configured refresh orchestration.
 - Release source links.
 - Deterministic HTML output.
@@ -196,6 +267,7 @@ The fixture pipeline provides deterministic data for repeatable checks.
 - Changelog quality depends on releases or conventional commits.
 - External pages can fail during capture.
 - Capture failures are reported and do not stop publishing.
+- Deploy adapters copy local folders. They do not upload to remote hosts.
 - Publishing creates local files. It does not deploy them.
 - Scheduled runs upload artifacts. They do not commit generated output.
 
@@ -205,8 +277,8 @@ The fixture pipeline provides deterministic data for repeatable checks.
 | --- | --- | --- |
 | v0.1 | Complete | Fixture demo, GitHub ingest, changelog, capture, publish, and privacy controls. |
 | v0.2 | Complete | Checked-in configuration, coordinated refresh command, and scheduled artifact workflow. |
-| v0.3 | Next | Custom themes and deployment adapters. |
-| v0.4 | Later | Commit-diff summaries and an RSS feed. |
+| v0.3 | Complete | Built-in themes, local deploy adapters, and the site manifest. |
+| v0.4 | Next | Commit-diff summaries and an RSS feed. |
 
 ## License
 

@@ -78,13 +78,25 @@ describe("database and publish pipeline", () => {
 
     const result = publishSite(config);
     expect(result.projectCount).toBe(1);
+    expect(result.theme).toBe("deep-space");
     expect(existsSync(result.indexPath)).toBe(true);
+    expect(existsSync(result.manifestPath)).toBe(true);
 
     const html = readFileSync(result.indexPath, "utf-8");
     expect(html).toContain("signal-router");
     expect(html).toContain("auditable SQLite data");
     expect(html).toContain("42 stars");
     expect(html).toContain("total stars");
+    expect(html).toContain("Theme / deep-space");
+
+    const manifest = JSON.parse(readFileSync(result.manifestPath, "utf-8")) as {
+      formatVersion: number;
+      theme: string;
+      files: string[];
+    };
+    expect(manifest.formatVersion).toBe(1);
+    expect(manifest.theme).toBe("deep-space");
+    expect(manifest.files).toContain("index.html");
   });
 
   it("respects visibility when publishing", async () => {

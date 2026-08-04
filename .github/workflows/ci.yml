@@ -44,6 +44,20 @@ jobs:
       - name: Run fixture demo
         run: node dist/index.js demo
 
+      - name: Verify theme catalog
+        run: node dist/index.js themes
+
+      - name: Verify site manifest
+        run: |
+          node -e "
+          const m = require('./output/site-manifest.json');
+          if (m.formatVersion !== 1) process.exit(1);
+          if (m.projectCount !== 2) process.exit(1);
+          if (!m.files.includes('index.html')) process.exit(1);
+          if (!m.files.includes('site-manifest.json')) process.exit(1);
+          console.log('Manifest ok: ' + m.projectCount + ' projects, theme ' + m.theme);
+          "
+
       - name: Store demo output
         if: success()
         uses: actions/upload-artifact@v4
