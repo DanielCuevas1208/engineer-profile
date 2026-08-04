@@ -3,7 +3,7 @@ import { rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { openDatabase } from "../src/db/client.js";
 import { ingestRepository } from "../src/ingest/orchestrator.js";
-import { publishSite, copyScreenshotsToOutput } from "../src/publish/site.js";
+import { publishSite } from "../src/publish/site.js";
 import { loadFixtureRepo, loadFixtureCommits, loadFixtureReleases } from "../src/fixtures/loader.js";
 import { DEFAULT_CONFIG } from "../src/types.js";
 
@@ -126,5 +126,61 @@ describe("database and publish pipeline", () => {
     expect(existsSync(changelogPath)).toBe(true);
     const md = readFileSync(changelogPath, "utf-8");
     expect(md).toContain("v0.3.0");
+  });
+
+  it("publishes a deployment manifest with theme and project records", async () => {
+    const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT };
+    await ingestRepository(
+      config,
+      { owner: "demo-engineer", repo: "signal-router" },
+      {
+        repo: loadFixtureRepo("signal-router"),
+        commits: loadFixtureCommits("signal-router"),
+        releases: loadFixtureReleases("signal-router"),
+      }
+    );
+
+    const result = publishSite(config);
+    expect(existsSync(result.manifestPath)).toBe(true);
+
+    const manifest = JSON.parse(readFileSync(result.manifestPath, "utf-8")) as {
+      formatVersion: number;
+      theme: string;
+      projectCount: number;
+      projects: Array<{ slug: string; stars: number; hasScreenshot: boolean }>;
+      files: string[];
+    };
+    expect(manifest.formatVersion).toBe(1);
+    expect(manifest.theme).toBe("deep-space");
+    expect(manifest.projectCount).toBe(1);
+    expect(manifest.projects[0].slug).toBe("demo-engineer-signal-router");
+    expect(manifest.projects[0].stars).toBe(42);
+    expect(manifest.files).toContain("index.html");
+    expect(manifest.files).toContain("site-manifest.json");
+  });
+
+  it("renders the configured theme name and variables", async () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      dataDir: TEST_DATA,
+      outputDir: TEST_OUTPUT,
+      theme: { name: "paper", accent: "#0f6bbd" },
+    };
+    await ingestRepository(
+      config,
+      { owner: "demo-engineer", repo: "signal-router" },
+      {
+        repo: loadFixtureRepo("signal-router"),
+        commits: loadFixtureCommits("signal-router"),
+        releases: loadFixtureReleases("signal-router"),
+      }
+    );
+
+    const result = publishSite(config);
+    const html = readFileSync(result.indexPath, "utf-8");
+
+    expect(html).toContain("color-scheme: light");
+    expect(html).toContain("--blue: #0f6bbd");
+    expect(html).toContain("Theme: paper");
   });
 });

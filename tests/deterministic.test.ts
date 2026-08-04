@@ -46,4 +46,20 @@ describe("deterministic publishing", () => {
     expect(html).toContain("https://github.com/demo-engineer/signal-router/releases/tag/v0.3.0");
     expect(existsSync(join(OUTPUTS[0], "demo-engineer-signal-router-changelog.md"))).toBe(true);
   });
+
+  it("produces the same manifest for the same fixture snapshot", async () => {
+    const fixtures = loadAllFixtures();
+    const manifests: string[] = [];
+    for (let index = 0; index < RUNS.length; index++) {
+      const config = fixedConfig(RUNS[index], OUTPUTS[index]);
+      await ingestOwnerRepos(config, config.owner, fixtures.length, fixtures);
+      const result = publishSite(config);
+      manifests.push(readFileSync(result.manifestPath, "utf-8"));
+    }
+
+    expect(manifests[0]).toBe(manifests[1]);
+    const parsed = JSON.parse(manifests[0]) as { formatVersion: number; projectCount: number };
+    expect(parsed.formatVersion).toBe(1);
+    expect(parsed.projectCount).toBe(2);
+  });
 });

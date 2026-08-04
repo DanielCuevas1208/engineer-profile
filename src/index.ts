@@ -4,19 +4,21 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { ingestOwnerRepos, ingestRepository } from "./ingest/orchestrator.js";
 import { captureAllProjects, captureLocalHtml, closeBrowser } from "./preview/capture.js";
-import { copyScreenshotsToOutput, publishSite } from "./publish/site.js";
+import { publishSite } from "./publish/site.js";
 import { loadAllFixtures } from "./fixtures/loader.js";
 import { openDatabase } from "./db/client.js";
 import { DEFAULT_CONFIG, type PortfolioConfig } from "./types.js";
 import { DEFAULT_CONFIG_PATH, loadPortfolioConfig } from "./config/loader.js";
 import { refreshPortfolio } from "./refresh/run.js";
+import { listBuiltinThemes } from "./theme/palette.js";
+import { deployAll } from "./deploy/local.js";
 
 const program = new Command();
 
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.2.0");
+  .version("0.3.0");
 
 function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
   const base = options.config
@@ -64,9 +66,8 @@ addConfigOption(program
     }
 
     const result = publishSite(config);
-    const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
-    console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Copied ${result.screenshotsCopied} available preview screenshots.`);
     console.log("Open output/index.html in a browser.");
   }));
 
@@ -128,10 +129,38 @@ addConfigOption(program
   .action((options) => {
     const config = resolveConfig(options);
     const result = publishSite(config);
-    const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
-    console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Copied ${result.screenshotsCopied} available preview screenshots.`);
   }));
+
+addConfigOption(program
+  .command("deploy")
+  .description("Publish the snapshot and copy it to configured deploy targets")
+  .option("-d, --data <dir>", "Data directory")
+  .option("-o, --output <dir>", "Output directory")
+  .action((options) => {
+    const config = resolveConfig(options);
+    const result = publishSite(config);
+    console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
+    const results = deployAll(config);
+    if (results.length === 0) {
+      console.log('No deploy targets configured. Add a "deploy.targets" entry to the configuration.');
+    }
+    for (const deployed of results) {
+      console.log(`Deployed ${deployed.targetName}: ${deployed.files} files to ${deployed.targetPath}.`);
+    }
+  }));
+
+program
+  .command("themes")
+  .description("List built-in presentation themes")
+  .action(() => {
+    const themes = listBuiltinThemes();
+    console.log(`Built-in themes: ${themes.length}`);
+    for (const theme of themes) {
+      console.log(`  ${theme.name}: ${theme.description}`);
+    }
+  });
 
 addConfigOption(program
   .command("refresh")
@@ -148,6 +177,9 @@ addConfigOption(program
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
     for (const error of result.captureErrors) {
       console.warn(`Skipped ${error.slug}: ${error.message}`);
+    }
+    for (const target of result.deployed) {
+      console.log(`Deployed to ${target}.`);
     }
   }));
 

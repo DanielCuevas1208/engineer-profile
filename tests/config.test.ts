@@ -37,4 +37,60 @@ describe("portfolio configuration", () => {
       'Configuration field "repositoryLimit" must be an integer from 1 to 100.'
     );
   });
+
+  it("loads a named theme with overrides", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({
+      theme: { name: "paper", accent: "#123456", radius: "18px", font: "Georgia, serif" },
+    }));
+
+    const config = loadPortfolioConfig(TEST_FILE);
+    expect(config.theme).toEqual({
+      name: "paper",
+      accent: "#123456",
+      radius: "18px",
+      font: "Georgia, serif",
+    });
+  });
+
+  it("rejects an unknown theme name", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({ theme: { name: "mystery" } }));
+
+    expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
+      'Configuration field "theme.name" must be one of'
+    );
+  });
+
+  it("rejects an invalid accent color", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({ theme: { name: "deep-space", accent: "red" } }));
+
+    expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
+      'Configuration field "theme.accent" must be a hex color'
+    );
+  });
+
+  it("loads local deploy targets", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({
+      deploy: { targets: [{ name: "preview", type: "local", target: "public" }] },
+    }));
+
+    const config = loadPortfolioConfig(TEST_FILE);
+    expect(config.deploy.targets).toEqual([
+      { name: "preview", type: "local", target: "public" },
+    ]);
+  });
+
+  it("rejects an unsupported deploy target type", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({
+      deploy: { targets: [{ name: "pages", type: "github-pages", target: "public" }] },
+    }));
+
+    expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
+      'Configuration field "deploy.targets[0].type" must be "local".'
+    );
+  });
 });

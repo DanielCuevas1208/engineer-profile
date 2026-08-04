@@ -2,7 +2,7 @@
 
 ## Local checks
 
-Use Node.js 20 or newer.
+Use Node.js 22 LTS or newer.
 
 ```bash
 npm ci
@@ -14,6 +14,13 @@ npm test
 
 Use fixtures for changes that need repeatable data.
 Do not add credentials, private repository data, or generated output.
+
+## Feature areas
+
+- Themes: add palettes in `src/theme/palette.ts`.
+- Deploy targets: add adapters in `src/deploy/`.
+- The publish step writes `site-manifest.json`.
+- Keep every behavior deterministic and covered by a test.
 
 ## Pull requests
 

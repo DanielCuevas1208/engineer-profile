@@ -45,6 +45,7 @@ describe("demo pipeline", () => {
     const html = readFileSync(published.indexPath, "utf-8");
     expect(html).toContain("signal-router");
     expect(html).toContain("metrics-kit");
+    expect(existsSync(published.manifestPath)).toBe(true);
     expect(existsSync(join(TEST_OUTPUT, "demo-engineer-signal-router-changelog.md"))).toBe(true);
     expect(existsSync(join(TEST_OUTPUT, "assets", "screenshots", "demo-engineer-signal-router.png"))).toBe(true);
   });

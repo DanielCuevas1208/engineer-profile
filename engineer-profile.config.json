@@ -5,6 +5,9 @@
   "repositoryLimit": 5,
   "dataDir": "data",
   "outputDir": "output",
+  "theme": {
+    "name": "deep-space"
+  },
   "privacy": {
     "hiddenProjects": [],
     "redactEmails": true,
