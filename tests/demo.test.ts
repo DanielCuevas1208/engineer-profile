@@ -47,5 +47,9 @@ describe("demo pipeline", () => {
     expect(html).toContain("metrics-kit");
     expect(existsSync(join(TEST_OUTPUT, "demo-engineer-signal-router-changelog.md"))).toBe(true);
     expect(existsSync(join(TEST_OUTPUT, "assets", "screenshots", "demo-engineer-signal-router.png"))).toBe(true);
+
+    const manifest = JSON.parse(readFileSync(published.manifestPath, "utf-8"));
+    expect(manifest.files).toContain("assets/screenshots/demo-engineer-signal-router.png");
+    expect(manifest.projectCount).toBe(2);
   });
 });

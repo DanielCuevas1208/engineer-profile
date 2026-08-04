@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
-import type { PortfolioConfig, PrivacyConfig } from "../types.js";
-import { DEFAULT_CONFIG, DEFAULT_PRIVACY } from "../types.js";
+import type { DeployConfig, PortfolioConfig, PrivacyConfig, ThemeConfig } from "../types.js";
+import { DEFAULT_CONFIG, DEFAULT_DEPLOY, DEFAULT_PRIVACY, DEFAULT_THEME } from "../types.js";
 import { mergePrivacy } from "../privacy/controls.js";
+import { isBuiltinTheme, isValidHexColor } from "../theme/palette.js";
 
 export const DEFAULT_CONFIG_PATH = "engineer-profile.config.json";
 
@@ -18,6 +19,78 @@ function readString(source: ConfigValue, key: string, fallback: string): string 
     throw new Error(`Configuration field "${key}" must be a non-empty string.`);
   }
   return value.trim();
+}
+
+function readTheme(source: ConfigValue): ThemeConfig {
+  if (!("theme" in source)) return DEFAULT_THEME;
+  if (!isConfigValue(source.theme)) {
+    throw new Error('Configuration field "theme" must be an object.');
+  }
+
+  const { name, accent, radius, font } = source.theme;
+  const theme: ThemeConfig = {};
+
+  if (name !== undefined) {
+    if (typeof name !== "string" || !isBuiltinTheme(name)) {
+      throw new Error('Configuration field "theme.name" must be a built-in theme name.');
+    }
+    theme.name = name;
+  }
+  if (accent !== undefined) {
+    if (typeof accent !== "string" || !isValidHexColor(accent)) {
+      throw new Error('Configuration field "theme.accent" must be a hex color.');
+    }
+    theme.accent = accent;
+  }
+  if (radius !== undefined) {
+    if (typeof radius !== "string" || radius.trim() === "") {
+      throw new Error('Configuration field "theme.radius" must be a non-empty string.');
+    }
+    theme.radius = radius;
+  }
+  if (font !== undefined) {
+    if (typeof font !== "string" || font.trim() === "") {
+      throw new Error('Configuration field "theme.font" must be a non-empty string.');
+    }
+    theme.font = font;
+  }
+
+  return { ...DEFAULT_THEME, ...theme };
+}
+
+function readDeploy(source: ConfigValue): DeployConfig {
+  if (!("deploy" in source)) return DEFAULT_DEPLOY;
+  if (!isConfigValue(source.deploy)) {
+    throw new Error('Configuration field "deploy" must be an object.');
+  }
+
+  const { targets } = source.deploy;
+  if (targets === undefined) return DEFAULT_DEPLOY;
+  if (!Array.isArray(targets)) {
+    throw new Error('Configuration field "deploy.targets" must be a list.');
+  }
+
+  const parsed = targets.map((entry, index) => {
+    if (!isConfigValue(entry)) {
+      throw new Error(`Deploy target ${index} must be an object.`);
+    }
+    if (typeof entry.name !== "string" || entry.name.trim() === "") {
+      throw new Error(`Deploy target ${index} must have a non-empty "name".`);
+    }
+    if (entry.type !== "local") {
+      throw new Error(`Deploy target "${entry.name}" uses an unknown adapter type.`);
+    }
+    if (typeof entry.target !== "string" || entry.target.trim() === "") {
+      throw new Error(`Deploy target "${entry.name}" must have a non-empty "target" path.`);
+    }
+    return {
+      name: entry.name.trim(),
+      type: "local" as const,
+      target: entry.target.trim(),
+    };
+  });
+
+  return { targets: parsed };
 }
 
 function readLimit(source: ConfigValue, key: string, fallback: number): number {
@@ -78,6 +151,8 @@ export function loadPortfolioConfig(
     repositoryLimit: readLimit(parsed, "repositoryLimit", DEFAULT_CONFIG.repositoryLimit),
     dataDir: readString(parsed, "dataDir", DEFAULT_CONFIG.dataDir),
     outputDir: readString(parsed, "outputDir", DEFAULT_CONFIG.outputDir),
+    theme: readTheme(parsed),
+    deploy: readDeploy(parsed),
     privacy: readPrivacy(parsed),
     clock,
   };

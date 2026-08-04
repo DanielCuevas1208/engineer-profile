@@ -79,12 +79,16 @@ describe("database and publish pipeline", () => {
     const result = publishSite(config);
     expect(result.projectCount).toBe(1);
     expect(existsSync(result.indexPath)).toBe(true);
+    expect(existsSync(result.manifestPath)).toBe(true);
+    expect(result.theme).toBe("deep-space");
 
     const html = readFileSync(result.indexPath, "utf-8");
     expect(html).toContain("signal-router");
     expect(html).toContain("auditable SQLite data");
     expect(html).toContain("42 stars");
     expect(html).toContain("total stars");
+    expect(html).toContain("--blue:");
+    expect(html).toContain("color-scheme: dark");
   });
 
   it("respects visibility when publishing", async () => {

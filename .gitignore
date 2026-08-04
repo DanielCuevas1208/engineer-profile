@@ -3,6 +3,7 @@ dist/
 coverage/
 data/
 output/
+site/
 *.db
 *.db-journal
 *.db-shm

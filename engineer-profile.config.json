@@ -5,6 +5,18 @@
   "repositoryLimit": 5,
   "dataDir": "data",
   "outputDir": "output",
+  "theme": {
+    "name": "deep-space"
+  },
+  "deploy": {
+    "targets": [
+      {
+        "name": "docs",
+        "type": "local",
+        "target": "site"
+      }
+    ]
+  },
   "privacy": {
     "hiddenProjects": [],
     "redactEmails": true,

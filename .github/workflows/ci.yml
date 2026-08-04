@@ -44,6 +44,15 @@ jobs:
       - name: Run fixture demo
         run: node dist/index.js demo
 
+      - name: Verify theme catalog
+        run: node dist/index.js themes
+
+      - name: Verify site manifest
+        run: "node -e \"const fs=require('fs');const m=JSON.parse(fs.readFileSync('output/site-manifest.json','utf8'));if(m.formatVersion!==1||m.projectCount<1)process.exit(1);console.log('Manifest ok - '+m.projectCount+' projects, theme '+m.theme)\""
+
+      - name: Verify local deploy
+        run: node dist/index.js deploy && test -f site/index.html
+
       - name: Store demo output
         if: success()
         uses: actions/upload-artifact@v4

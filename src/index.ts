@@ -5,6 +5,8 @@ import { Command } from "commander";
 import { ingestOwnerRepos, ingestRepository } from "./ingest/orchestrator.js";
 import { captureAllProjects, captureLocalHtml, closeBrowser } from "./preview/capture.js";
 import { copyScreenshotsToOutput, publishSite } from "./publish/site.js";
+import { runDeploys } from "./deploy/index.js";
+import { listBuiltinThemes } from "./theme/palette.js";
 import { loadAllFixtures } from "./fixtures/loader.js";
 import { openDatabase } from "./db/client.js";
 import { DEFAULT_CONFIG, type PortfolioConfig } from "./types.js";
@@ -16,7 +18,7 @@ const program = new Command();
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.2.0");
+  .version("0.3.0");
 
 function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
   const base = options.config
@@ -29,6 +31,10 @@ function resolveConfig(options: { config?: string; data?: string; output?: strin
     dataDir: options.data ?? base.dataDir,
     outputDir: options.output ?? base.outputDir,
   };
+}
+
+function displayPath(path: string): string {
+  return path.split("\\").join("/");
 }
 
 function addConfigOption(command: Command): Command {
@@ -65,7 +71,8 @@ addConfigOption(program
 
     const result = publishSite(config);
     const copied = copyScreenshotsToOutput(config);
-    console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
+    console.log(`Published ${result.projectCount} projects to ${displayPath(result.indexPath)}.`);
+    console.log(`Theme ${result.theme} applied. Wrote deploy manifest to ${displayPath(result.manifestPath)}.`);
     console.log(`Copied ${copied} available preview screenshots.`);
     console.log("Open output/index.html in a browser.");
   }));
@@ -129,8 +136,32 @@ addConfigOption(program
     const config = resolveConfig(options);
     const result = publishSite(config);
     const copied = copyScreenshotsToOutput(config);
-    console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
+    console.log(`Published ${result.projectCount} projects to ${displayPath(result.indexPath)}.`);
+    console.log(`Theme ${result.theme} applied.`);
     console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Wrote deploy manifest to ${displayPath(result.manifestPath)}.`);
+  }));
+
+program
+  .command("themes")
+  .description("List available built-in themes")
+  .action(() => {
+    for (const theme of listBuiltinThemes()) {
+      console.log(`${theme.name}: ${theme.description}`);
+    }
+  });
+
+addConfigOption(program
+  .command("deploy")
+  .description("Deploy the published site to configured targets")
+  .option("-d, --data <dir>", "Data directory")
+  .option("-o, --output <dir>", "Output directory")
+  .action((options) => {
+    const config = resolveConfig(options);
+    const results = runDeploys(config);
+    for (const result of results) {
+      console.log(`Deployed to ${result.targetName} (${displayPath(result.targetPath)}, ${result.files} files).`);
+    }
   }));
 
 addConfigOption(program
@@ -144,7 +175,7 @@ addConfigOption(program
     const result = await refreshPortfolio(config);
     console.log(`Ingested ${result.ingested} repositories for ${config.owner}.`);
     console.log(`Captured ${result.captured} project previews.`);
-    console.log(`Published ${result.published.projectCount} projects to ${result.published.indexPath}.`);
+    console.log(`Published ${result.published.projectCount} projects to ${displayPath(result.published.indexPath)}.`);
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
     for (const error of result.captureErrors) {
       console.warn(`Skipped ${error.slug}: ${error.message}`);
