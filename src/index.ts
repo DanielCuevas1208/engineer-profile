@@ -71,7 +71,7 @@ addConfigOption(program
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
     console.log(`Wrote theme gallery to ${result.galleryPath}.`);
     console.log(`Wrote RSS feed to ${result.feedPath}.`);
-    console.log("Open output/index.html in a browser.");
+    console.log(`Open ${result.indexPath} in a browser.`);
   }));
 
 addConfigOption(program
@@ -134,6 +134,7 @@ addConfigOption(program
     const result = publishSite(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+    console.log(`Wrote theme gallery to ${result.galleryPath}.`);
     console.log(`Wrote RSS feed to ${result.feedPath}.`);
   }));
 
@@ -174,7 +175,9 @@ program
         ? loadPortfolioConfig(DEFAULT_CONFIG_PATH)
         : DEFAULT_CONFIG;
       const entries = [...builtinGalleryThemes(), { label: "configured", theme: config.theme }];
-      const targetPath = options.preview === true ? join("output", "theme-gallery.html") : options.preview;
+      const targetPath = options.preview === true
+        ? join(config.outputDir, "theme-gallery.html")
+        : options.preview;
       mkdirSync(dirname(targetPath), { recursive: true });
       writeFileSync(targetPath, renderThemeGallery(entries), "utf-8");
       console.log(`Wrote theme gallery with ${entries.length} themes to ${targetPath}.`);
@@ -197,6 +200,7 @@ addConfigOption(program
     const result = publishSite(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+    console.log(`Wrote theme gallery to ${result.galleryPath}.`);
     console.log(`Wrote RSS feed to ${result.feedPath}.`);
     const results = deployAll(config);
     if (results.length === 0) {
