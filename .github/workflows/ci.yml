@@ -50,6 +50,9 @@ jobs:
       - name: Verify site manifest, commit trail, and RSS feed
         run: node scripts/verify-manifest.mjs
 
+      - name: Preview local deploy
+        run: node dist/index.js deploy --dry-run
+
       - name: Verify local deploy
         run: node dist/index.js deploy
 

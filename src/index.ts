@@ -12,14 +12,14 @@ import { DEFAULT_CONFIG_PATH, loadPortfolioConfig } from "./config/loader.js";
 import { refreshPortfolio } from "./refresh/run.js";
 import { listBuiltinThemes } from "./theme/palette.js";
 import { builtinGalleryThemes, renderThemeGallery } from "./theme/gallery.js";
-import { deployAll } from "./deploy/index.js";
+import { deployAll, previewAll, type DeployPreview } from "./deploy/index.js";
 
 const program = new Command();
 
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.4.0");
+  .version("0.5.0");
 
 function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
   const base = options.config
@@ -36,6 +36,17 @@ function resolveConfig(options: { config?: string; data?: string; output?: strin
 
 function addConfigOption(command: Command): Command {
   return command.option("-c, --config <file>", "Configuration file");
+}
+
+function printDeployPreview(preview: DeployPreview): void {
+  console.log(
+    `Preview ${preview.targetName}: ${preview.status} ` +
+      `(${preview.added.length} added, ${preview.changed.length} changed, ` +
+      `${preview.removed.length} removed, ${preview.unchanged} unchanged).`
+  );
+  for (const path of preview.added) console.log(`  + ${path}`);
+  for (const path of preview.changed) console.log(`  ~ ${path}`);
+  for (const path of preview.removed) console.log(`  - ${path}`);
 }
 
 addConfigOption(program
@@ -194,6 +205,7 @@ addConfigOption(program
   .description("Publish the snapshot and copy it to configured deploy targets")
   .option("-d, --data <dir>", "Data directory")
   .option("-o, --output <dir>", "Output directory")
+  .option("--dry-run", "Preview file changes without syncing targets")
   .action((options) => {
     const config = resolveConfig(options);
     mkdirSync(config.dataDir, { recursive: true });
@@ -202,6 +214,14 @@ addConfigOption(program
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
     console.log(`Wrote theme gallery to ${result.galleryPath}.`);
     console.log(`Wrote RSS feed to ${result.feedPath}.`);
+    if (options.dryRun) {
+      const previews = previewAll(config);
+      if (previews.length === 0) {
+        console.log('No deploy targets configured. Add a "deploy.targets" entry to the configuration.');
+      }
+      for (const preview of previews) printDeployPreview(preview);
+      return;
+    }
     const results = deployAll(config);
     if (results.length === 0) {
       console.log('No deploy targets configured. Add a "deploy.targets" entry to the configuration.');

@@ -18,6 +18,7 @@ paths in SQLite. It publishes a static site from these records.
 - Publish an RSS feed from visible projects.
 - Deploy the snapshot to configured local targets.
 - Sync targets and remove stale files before verification.
+- Preview local deployment changes before synchronization.
 - Record a machine-readable manifest with every publish.
 - Run one configured refresh from a scheduled workflow.
 
@@ -60,7 +61,7 @@ flowchart LR
 | `src/privacy/` | Hide projects and block sensitive commit messages. |
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
 | `src/publish/` | Render HTML, changelog files, commit-trail files, the theme gallery, the RSS feed, the site manifest, and preview assets. |
-| `src/deploy/` | Sync published output to local targets and verify the snapshot. |
+| `src/deploy/` | Compare published snapshots and sync local targets. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
 The refresh command runs each stage in a fixed order.
@@ -79,6 +80,7 @@ npm run demo
 Open `output/index.html` in a browser.
 Open `output/theme-gallery.html` to compare the built-in themes.
 Open `output/feed.xml` to inspect the RSS feed.
+Run `node dist/index.js deploy --dry-run` to preview target changes.
 
 The demo creates a local SQLite database under `data/`.
 It writes the static site under `output/`.
@@ -155,6 +157,11 @@ Deploy removes stale files first, then copies the new snapshot.
 It copies the snapshot, then verifies the key output files.
 Each deploy records an audit entry with the file counts.
 
+Deployment previews compare file paths and SHA-256 content hashes.
+Use the dry run before a local sync.
+It reports added, changed, removed, and unchanged files.
+It does not create or modify the target.
+
 ```json
 {
   "deploy": {
@@ -207,6 +214,10 @@ Published 2 projects to output/index.html.
 Copied 2 available preview screenshots.
 Wrote theme gallery to output/theme-gallery.html.
 Wrote RSS feed to output/feed.xml.
+Preview public: changed (0 added, 3 changed, 0 removed, 7 unchanged).
+  ~ feed.xml
+  ~ index.html
+  ~ site-manifest.json
 Open output/index.html in a browser.
 ```
 
@@ -239,6 +250,7 @@ Build before direct CLI commands.
 | `npm run gallery` | Build and write the theme gallery page. |
 | `npm run refresh` | Run configured ingest, capture, publish, and deploy stages. |
 | `node dist/index.js deploy` | Publish the snapshot and sync it to configured targets. |
+| `node dist/index.js deploy --dry-run` | Publish the snapshot and preview target changes without syncing. |
 | `node dist/index.js themes` | List built-in presentation themes. |
 | `node dist/index.js themes --preview` | Write a theme gallery HTML page. |
 | `node dist/index.js status` | Show visibility and recent operations. |
@@ -299,6 +311,7 @@ The test suite covers these core behaviors:
 - Theme resolution, CSS variable emission, and gallery rendering.
 - Generated CSS token application for font and radius.
 - Local deploy sync, stale cleanup, and verification.
+- Snapshot previews with deterministic added, changed, removed, and unchanged file lists.
 - Site manifest versioning, determinism, and theme details.
 - Playwright screenshot capture.
 
@@ -330,6 +343,8 @@ They check the site manifest, the generated CSS tokens, the RSS feed, and the de
 - Publishing creates local files. It does not deploy them.
 - Themes offer built-in palettes, selected overrides, and a generated gallery.
 - Local deploy syncs files. It does not push to hosts.
+- Remote deploy adapters are not implemented.
+- A dry run publishes the local snapshot before comparison.
 - The RSS feed uses the configured base URL or the GitHub profile.
 - Scheduled runs upload artifacts. They do not commit generated output.
 
@@ -341,8 +356,9 @@ They check the site manifest, the generated CSS tokens, the RSS feed, and the de
 | v0.2 | Complete | Checked-in configuration, coordinated refresh command, and scheduled artifact workflow. |
 | v0.3 | Complete | Built-in themes, theme overrides, generated CSS tokens for font and radius, theme gallery page, versioned site manifest, and local deploy sync. |
 | v0.4 | Complete | Commit-diff summaries, a commit trail on the site, and an RSS feed. |
-| v0.5 | Next | Remote deploy adapters and preview diffs. |
-| v0.6 | Later | Release brief digests and changelog archiving. |
+| v0.5 | Complete | Local deployment previews with deterministic file and content diffs. |
+| v0.6 | Next | Remote deploy adapters with provider-specific credentials and verification. |
+| v0.7 | Later | Release brief digests and changelog archiving. |
 
 ## License
 

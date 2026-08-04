@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { deployAll, deployToTarget } from "../src/deploy/index.js";
+import { deployAll, deployToTarget, previewAll, previewToTarget } from "../src/deploy/index.js";
 import { openDatabase } from "../src/db/client.js";
 import { DEFAULT_CONFIG } from "../src/types.js";
 
@@ -78,6 +78,57 @@ describe("deploy adapters", () => {
 
     expect(result[0].verified).toBe(false);
     expect(result[0].files).toBe(1);
+  });
+
+  it("previews added, changed, removed, and unchanged files without writing the target", () => {
+    writePublishedSite();
+    writeFileSync(join(TEST_OUTPUT, "new.txt"), "new", "utf-8");
+    mkdirSync(TEST_TARGET, { recursive: true });
+    writeFileSync(join(TEST_TARGET, "index.html"), "old", "utf-8");
+    writeFileSync(join(TEST_TARGET, "site-manifest.json"), "{}", "utf-8");
+    writeFileSync(join(TEST_TARGET, "stale.txt"), "stale", "utf-8");
+    const config = publishedConfig();
+
+    const result = previewAll(config);
+
+    expect(result[0]).toMatchObject({
+      targetName: "public",
+      status: "changed",
+      added: ["new.txt"],
+      changed: ["index.html"],
+      removed: ["stale.txt"],
+      unchanged: 1,
+      files: 3,
+    });
+    expect(readFileSync(join(TEST_TARGET, "index.html"), "utf-8")).toBe("old");
+    expect(existsSync(join(TEST_TARGET, "stale.txt"))).toBe(true);
+  });
+
+  it("previews a missing target without creating its directory", () => {
+    writePublishedSite();
+    const config = publishedConfig();
+
+    const result = previewToTarget(config, config.deploy.targets[0]);
+
+    expect(result.status).toBe("changed");
+    expect(result.added).toEqual(["index.html", "site-manifest.json"]);
+    expect(result.changed).toEqual([]);
+    expect(result.removed).toEqual([]);
+    expect(existsSync(TEST_TARGET)).toBe(false);
+  });
+
+  it("reports a clean preview when both snapshots match", () => {
+    writePublishedSite();
+    const config = publishedConfig();
+    deployAll(config);
+
+    const result = previewToTarget(config, config.deploy.targets[0]);
+
+    expect(result.status).toBe("clean");
+    expect(result.added).toEqual([]);
+    expect(result.changed).toEqual([]);
+    expect(result.removed).toEqual([]);
+    expect(result.unchanged).toBe(result.files);
   });
 
   it("reports a publish-first error when output is missing", () => {
