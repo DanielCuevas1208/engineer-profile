@@ -20,7 +20,9 @@ Check that `output/index.html` applies the theme font and radius tokens.
 Verify `output/site-manifest.json` after publish changes.
 Check the deploy sync with `node dist/index.js deploy`.
 Run `node dist/index.js deploy --dry-run` before changing a deploy target.
+Run `node dist/index.js deploy --dry-run --json` to inspect the report contract.
 Run `node scripts/verify-manifest.mjs` and `node scripts/verify-deploy.mjs` after CI-only changes.
+Run `node scripts/verify-deploy-report.mjs` after deployment report changes.
 Verify `output/feed.xml` after changelog or feed changes.
 Check `output/*-changes.md` after commit-diff changes.
 

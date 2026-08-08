@@ -6,6 +6,8 @@ import type { DeployPreview } from "./preview.js";
 
 export type { DeployResult } from "./local.js";
 export type { DeployPreview } from "./preview.js";
+export { createDeployReport } from "./report.js";
+export type { DeployReport, DeployReportMode, DeployReportTarget } from "./report.js";
 
 export function deployToTarget(
   config: PortfolioConfig,

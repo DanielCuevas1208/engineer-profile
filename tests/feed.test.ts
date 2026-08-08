@@ -7,7 +7,7 @@ const channel = {
   description: "A living index of shipped systems",
   language: "en",
   lastBuildDate: "Wed, 29 Jul 2026 12:00:00 GMT",
-  generator: "engineer-profile/0.5.0",
+  generator: "engineer-profile/0.6.0",
 };
 
 function item(overrides: Partial<RssItem> = {}): RssItem {

@@ -2,7 +2,7 @@ import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { openDatabase } from "../db/client.js";
 import type { DeployTarget, PortfolioConfig } from "../types.js";
-import { listSnapshotPaths } from "./snapshot.js";
+import { digestSnapshot, listSnapshotPaths } from "./snapshot.js";
 
 export interface DeployResult {
   targetName: string;
@@ -10,6 +10,8 @@ export interface DeployResult {
   files: number;
   removed: number;
   verified: boolean;
+  sourceDigest: string | null;
+  targetDigest: string | null;
 }
 
 function isPathInside(parent: string, child: string): boolean {
@@ -47,9 +49,12 @@ export function deployLocal(
 
   cpSync(config.outputDir, target.target, { recursive: true, force: true });
   const files = listSnapshotPaths(targetRoot).length;
-  const verified =
+  const hasRequiredFiles =
     existsSync(join(targetRoot, "index.html")) &&
     existsSync(join(targetRoot, "site-manifest.json"));
+  const sourceDigest = digestSnapshot(outputRoot);
+  const targetDigest = digestSnapshot(targetRoot);
+  const verified = hasRequiredFiles && sourceDigest === targetDigest;
 
   const db = openDatabase(config.dataDir, config.clock);
   try {
@@ -59,5 +64,13 @@ export function deployLocal(
     db.close();
   }
 
-  return { targetName: target.name, targetPath: target.target, files, removed, verified };
+  return {
+    targetName: target.name,
+    targetPath: target.target,
+    files,
+    removed,
+    verified,
+    sourceDigest,
+    targetDigest,
+  };
 }

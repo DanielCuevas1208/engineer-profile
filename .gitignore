@@ -13,6 +13,8 @@ output/
 !.env.example
 playwright-report/
 test-results/
+deploy-preview.json
+deploy-sync.json
 .cache/
 .DS_Store
 Thumbs.db

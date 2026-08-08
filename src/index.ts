@@ -13,13 +13,14 @@ import { refreshPortfolio } from "./refresh/run.js";
 import { listBuiltinThemes } from "./theme/palette.js";
 import { builtinGalleryThemes, renderThemeGallery } from "./theme/gallery.js";
 import { deployAll, previewAll, type DeployPreview } from "./deploy/index.js";
+import { createDeployReport } from "./deploy/report.js";
 
 const program = new Command();
 
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.5.0");
+  .version("0.6.0");
 
 function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
   const base = options.config
@@ -206,16 +207,27 @@ addConfigOption(program
   .option("-d, --data <dir>", "Data directory")
   .option("-o, --output <dir>", "Output directory")
   .option("--dry-run", "Preview file changes without syncing targets")
+  .option("--json", "Print a machine-readable deployment report")
   .action((options) => {
     const config = resolveConfig(options);
     mkdirSync(config.dataDir, { recursive: true });
     const result = publishSite(config);
-    console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
-    console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
-    console.log(`Wrote theme gallery to ${result.galleryPath}.`);
-    console.log(`Wrote RSS feed to ${result.feedPath}.`);
+    if (!options.json) {
+      console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
+      console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+      console.log(`Wrote theme gallery to ${result.galleryPath}.`);
+      console.log(`Wrote RSS feed to ${result.feedPath}.`);
+    }
     if (options.dryRun) {
       const previews = previewAll(config);
+      if (options.json) {
+        console.log(JSON.stringify(
+          createDeployReport('preview', result.generatedAt, config.outputDir, previews),
+          null,
+          2
+        ));
+        return;
+      }
       if (previews.length === 0) {
         console.log('No deploy targets configured. Add a "deploy.targets" entry to the configuration.');
       }
@@ -223,6 +235,14 @@ addConfigOption(program
       return;
     }
     const results = deployAll(config);
+    if (options.json) {
+      console.log(JSON.stringify(
+        createDeployReport('sync', result.generatedAt, config.outputDir, results),
+        null,
+        2
+      ));
+      return;
+    }
     if (results.length === 0) {
       console.log('No deploy targets configured. Add a "deploy.targets" entry to the configuration.');
     }

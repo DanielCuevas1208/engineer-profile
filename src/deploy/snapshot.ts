@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 export interface SnapshotDiff {
@@ -8,6 +8,8 @@ export interface SnapshotDiff {
   removed: string[];
   unchanged: number;
   files: number;
+  sourceDigest: string | null;
+  targetDigest: string | null;
   status: "clean" | "changed";
 }
 
@@ -36,6 +38,19 @@ function digestFile(root: string, relativePath: string): string {
     .digest("hex");
 }
 
+export function digestSnapshot(root: string): string | null {
+  if (!existsSync(root) || !statSync(root).isDirectory()) return null;
+
+  const digest = createHash("sha256");
+  for (const relativePath of listSnapshotPaths(root)) {
+    digest.update(relativePath);
+    digest.update("\0");
+    digest.update(digestFile(root, relativePath));
+    digest.update("\n");
+  }
+  return digest.digest("hex");
+}
+
 export function compareSnapshots(sourceRoot: string, targetRoot: string): SnapshotDiff {
   const sourcePaths = listSnapshotPaths(sourceRoot);
   const targetPaths = listSnapshotPaths(targetRoot);
@@ -52,6 +67,8 @@ export function compareSnapshots(sourceRoot: string, targetRoot: string): Snapsh
     removed,
     unchanged: common.length - changed.length,
     files: sourcePaths.length,
+    sourceDigest: digestSnapshot(sourceRoot),
+    targetDigest: digestSnapshot(targetRoot),
     status: added.length || changed.length || removed.length ? "changed" : "clean",
   };
 }

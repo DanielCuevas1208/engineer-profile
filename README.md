@@ -19,6 +19,7 @@ paths in SQLite. It publishes a static site from these records.
 - Deploy the snapshot to configured local targets.
 - Sync targets and remove stale files before verification.
 - Preview local deployment changes before synchronization.
+- Generate JSON deployment reports for CI and release tooling.
 - Record a machine-readable manifest with every publish.
 - Run one configured refresh from a scheduled workflow.
 
@@ -61,7 +62,7 @@ flowchart LR
 | `src/privacy/` | Hide projects and block sensitive commit messages. |
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
 | `src/publish/` | Render HTML, changelog files, commit-trail files, the theme gallery, the RSS feed, the site manifest, and preview assets. |
-| `src/deploy/` | Compare published snapshots and sync local targets. |
+| `src/deploy/` | Compare snapshots, compute digests, create reports, and sync local targets. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
 The refresh command runs each stage in a fixed order.
@@ -156,11 +157,16 @@ A target must live outside the output directory.
 Deploy removes stale files first, then copies the new snapshot.
 It copies the snapshot, then verifies the key output files.
 Each deploy records an audit entry with the file counts.
+Each report records a SHA-256 digest for the source and target snapshots.
 
 Deployment previews compare file paths and SHA-256 content hashes.
 Use the dry run before a local sync.
 It reports added, changed, removed, and unchanged files.
 It does not create or modify the target.
+
+Use `--json` when another tool must read the deployment result.
+Preview reports include file changes and snapshot digests.
+Sync reports include file counts, verification, and matching digests.
 
 ```json
 {
@@ -179,6 +185,13 @@ It does not create or modify the target.
 The refresh command deploys configured targets after publishing.
 Run `node dist/index.js deploy` to publish and deploy in one step.
 The command reports the file count, the removed stale count, and the verification state.
+Add `--json` to print a stable report instead of human-readable lines.
+
+The report verifier prints this result:
+
+```text
+Deploy report ok: 1 target(s), mode preview.
+```
 
 Run a network-backed refresh with the checked-in settings:
 
@@ -235,6 +248,7 @@ The full detail lives in `output/<slug>-changes.md`.
 
 The demo also writes `output/site-manifest.json`.
 The manifest records the theme details, project list, generated files, and the RSS feed.
+The deployment report records the target path and snapshot identity.
 
 ## Commands
 
@@ -251,6 +265,7 @@ Build before direct CLI commands.
 | `npm run refresh` | Run configured ingest, capture, publish, and deploy stages. |
 | `node dist/index.js deploy` | Publish the snapshot and sync it to configured targets. |
 | `node dist/index.js deploy --dry-run` | Publish the snapshot and preview target changes without syncing. |
+| `node dist/index.js deploy --dry-run --json` | Print a machine-readable preview report. |
 | `node dist/index.js themes` | List built-in presentation themes. |
 | `node dist/index.js themes --preview` | Write a theme gallery HTML page. |
 | `node dist/index.js status` | Show visibility and recent operations. |
@@ -291,7 +306,7 @@ Deploy operations keep their target name and verification state in the audit tra
 
 The regular CI workflow runs typecheck, build, tests, the fixture demo, theme
 verification, manifest verification, RSS feed verification, local deploy verification,
-and artifact upload.
+deployment report verification, and artifact upload.
 The scheduled refresh workflow runs each Monday and supports manual dispatch.
 It uploads the generated site as a workflow artifact.
 
@@ -312,6 +327,7 @@ The test suite covers these core behaviors:
 - Generated CSS token application for font and radius.
 - Local deploy sync, stale cleanup, and verification.
 - Snapshot previews with deterministic added, changed, removed, and unchanged file lists.
+- Snapshot digests and preview or sync deployment reports.
 - Site manifest versioning, determinism, and theme details.
 - Playwright screenshot capture.
 
@@ -325,8 +341,10 @@ npm test
 
 ### Validation status
 
-Typecheck, build, and all tests pass locally.
-CI runs the complete test suite on Ubuntu with Chromium installed.
+Typecheck and build pass locally.
+The restricted Windows sandbox blocks Vitest's esbuild child process.
+CI runs the full test suite on Ubuntu.
+CI installs Chromium before Playwright checks.
 The fixture pipeline provides deterministic data for repeatable checks.
 The demo output feeds two verification scripts in CI.
 They check the site manifest, the generated CSS tokens, the RSS feed, and the deployed snapshot.
@@ -343,6 +361,7 @@ They check the site manifest, the generated CSS tokens, the RSS feed, and the de
 - Publishing creates local files. It does not deploy them.
 - Themes offer built-in palettes, selected overrides, and a generated gallery.
 - Local deploy syncs files. It does not push to hosts.
+- Snapshot digests identify local bytes. They do not verify a remote host.
 - Remote deploy adapters are not implemented.
 - A dry run publishes the local snapshot before comparison.
 - The RSS feed uses the configured base URL or the GitHub profile.
@@ -357,8 +376,9 @@ They check the site manifest, the generated CSS tokens, the RSS feed, and the de
 | v0.3 | Complete | Built-in themes, theme overrides, generated CSS tokens for font and radius, theme gallery page, versioned site manifest, and local deploy sync. |
 | v0.4 | Complete | Commit-diff summaries, a commit trail on the site, and an RSS feed. |
 | v0.5 | Complete | Local deployment previews with deterministic file and content diffs. |
-| v0.6 | Next | Remote deploy adapters with provider-specific credentials and verification. |
-| v0.7 | Later | Release brief digests and changelog archiving. |
+| v0.6 | Complete | Snapshot digests, JSON deployment reports, and CI report verification. |
+| v0.7 | Next | Remote deploy adapters with provider-specific credentials and verification. |
+| v0.8 | Later | Release brief digests and changelog archiving. |
 
 ## License
 

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { join } from "node:path";
 import { deployAll, deployToTarget, previewAll, previewToTarget } from "../src/deploy/index.js";
 import { openDatabase } from "../src/db/client.js";
+import { digestSnapshot } from "../src/deploy/snapshot.js";
 import { DEFAULT_CONFIG } from "../src/types.js";
 
 const TEST_DATA = join("data", "test-deploy");
@@ -52,6 +53,8 @@ describe("deploy adapters", () => {
     expect(result[0].files).toBeGreaterThanOrEqual(2);
     expect(result[0].removed).toBe(0);
     expect(result[0].verified).toBe(true);
+    expect(result[0].sourceDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(result[0].targetDigest).toBe(result[0].sourceDigest);
     expect(existsSync(join(TEST_TARGET, "index.html"))).toBe(true);
     expect(existsSync(join(TEST_TARGET, "site-manifest.json"))).toBe(true);
   });
@@ -114,7 +117,21 @@ describe("deploy adapters", () => {
     expect(result.added).toEqual(["index.html", "site-manifest.json"]);
     expect(result.changed).toEqual([]);
     expect(result.removed).toEqual([]);
+    expect(result.sourceDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.targetDigest).toBeNull();
     expect(existsSync(TEST_TARGET)).toBe(false);
+  });
+
+  it("produces a stable digest for the same snapshot and changes it when content changes", () => {
+    writePublishedSite();
+    const first = digestSnapshot(TEST_OUTPUT);
+    const second = digestSnapshot(TEST_OUTPUT);
+
+    expect(first).toBe(second);
+    expect(first).toMatch(/^[a-f0-9]{64}$/);
+
+    writeFileSync(join(TEST_OUTPUT, "index.html"), "<html>changed</html>", "utf-8");
+    expect(digestSnapshot(TEST_OUTPUT)).not.toBe(first);
   });
 
   it("reports a clean preview when both snapshots match", () => {
