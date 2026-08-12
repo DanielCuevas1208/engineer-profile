@@ -15,6 +15,7 @@ playwright-report/
 test-results/
 deploy-preview.json
 deploy-sync.json
+deploy-pages-preview.json
 .cache/
 .DS_Store
 Thumbs.db

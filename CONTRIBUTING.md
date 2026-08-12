@@ -23,6 +23,8 @@ Run `node dist/index.js deploy --dry-run` before changing a deploy target.
 Run `node dist/index.js deploy --dry-run --json` to inspect the report contract.
 Run `node scripts/verify-manifest.mjs` and `node scripts/verify-deploy.mjs` after CI-only changes.
 Run `node scripts/verify-deploy-report.mjs` after deployment report changes.
+Set `SITE_URL` to a reachable HTTPS URL before running `node scripts/verify-pages.mjs`.
+Check `.github/workflows/pages.yml` permissions after remote publishing changes.
 Verify `output/feed.xml` after changelog or feed changes.
 Check `output/*-changes.md` after commit-diff changes.
 

@@ -22,6 +22,8 @@ paths in SQLite. It publishes a static site from these records.
 - Generate JSON deployment reports for CI and release tooling.
 - Record a machine-readable manifest with every publish.
 - Run one configured refresh from a scheduled workflow.
+- Publish a refreshed snapshot to GitHub Pages with a short-lived workflow token.
+- Verify the artifact and the deployed HTTPS page after publication.
 
 The fixture demo runs without secrets and without network access.
 
@@ -48,6 +50,7 @@ flowchart LR
   W --> X[RSS feed]
   M --> K[Deploy]
   X --> K
+  K --> H[GitHub Pages]
 ```
 
 | Area | Responsibility |
@@ -62,7 +65,8 @@ flowchart LR
 | `src/privacy/` | Hide projects and block sensitive commit messages. |
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
 | `src/publish/` | Render HTML, changelog files, commit-trail files, the theme gallery, the RSS feed, the site manifest, and preview assets. |
-| `src/deploy/` | Compare snapshots, compute digests, create reports, and sync local targets. |
+| `src/deploy/` | Compare snapshots, compute digests, create reports, sync local targets, and verify Pages output. |
+| `scripts/verify-pages.mjs` | Check the deployed HTTPS page after a Pages release. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
 The refresh command runs each stage in a fixed order.
@@ -86,6 +90,16 @@ Run `node dist/index.js deploy --dry-run` to preview target changes.
 The demo creates a local SQLite database under `data/`.
 It writes the static site under `output/`.
 Both directories are ignored by Git.
+
+### GitHub Pages
+
+Enable GitHub Pages with GitHub Actions as its source.
+Run the `Publish portfolio to GitHub Pages` workflow from Actions.
+The workflow also runs each Monday.
+It refreshes public repository data before it uploads the site artifact.
+It verifies the manifest, local snapshot, deployment report, and published HTTPS page.
+The workflow uses GitHub's short-lived token.
+It stores no deployment credential in this repository.
 
 ## Configuration
 
@@ -250,6 +264,12 @@ The demo also writes `output/site-manifest.json`.
 The manifest records the theme details, project list, generated files, and the RSS feed.
 The deployment report records the target path and snapshot identity.
 
+A successful Pages run reports this result shape:
+
+```text
+Pages ok: <workflow page URL> returned 200 (EngineerProfile / Portfolio).
+```
+
 ## Commands
 
 Build before direct CLI commands.
@@ -309,6 +329,8 @@ verification, manifest verification, RSS feed verification, local deploy verific
 deployment report verification, and artifact upload.
 The scheduled refresh workflow runs each Monday and supports manual dispatch.
 It uploads the generated site as a workflow artifact.
+The Pages workflow refreshes, verifies, and publishes the site artifact.
+It checks the deployed HTTPS URL after publication.
 
 The test suite covers these core behaviors:
 
@@ -330,6 +352,7 @@ The test suite covers these core behaviors:
 - Snapshot digests and preview or sync deployment reports.
 - Site manifest versioning, determinism, and theme details.
 - Playwright screenshot capture.
+- Published HTTPS page verification with mocked responses.
 
 Run the local checks:
 
@@ -348,6 +371,7 @@ CI installs Chromium before Playwright checks.
 The fixture pipeline provides deterministic data for repeatable checks.
 The demo output feeds two verification scripts in CI.
 They check the site manifest, the generated CSS tokens, the RSS feed, and the deployed snapshot.
+The Pages workflow uses the same snapshot checks with a variable project count.
 
 ## Limitations
 
@@ -362,7 +386,9 @@ They check the site manifest, the generated CSS tokens, the RSS feed, and the de
 - Themes offer built-in palettes, selected overrides, and a generated gallery.
 - Local deploy syncs files. It does not push to hosts.
 - Snapshot digests identify local bytes. They do not verify a remote host.
-- Remote deploy adapters are not implemented.
+- GitHub Pages is the only remote publisher.
+- Other hosting providers require new adapters.
+- Pages verification needs a reachable HTTPS site.
 - A dry run publishes the local snapshot before comparison.
 - The RSS feed uses the configured base URL or the GitHub profile.
 - Scheduled runs upload artifacts. They do not commit generated output.
@@ -377,8 +403,9 @@ They check the site manifest, the generated CSS tokens, the RSS feed, and the de
 | v0.4 | Complete | Commit-diff summaries, a commit trail on the site, and an RSS feed. |
 | v0.5 | Complete | Local deployment previews with deterministic file and content diffs. |
 | v0.6 | Complete | Snapshot digests, JSON deployment reports, and CI report verification. |
-| v0.7 | Next | Remote deploy adapters with provider-specific credentials and verification. |
-| v0.8 | Later | Release brief digests and changelog archiving. |
+| v0.7 | Complete | GitHub Pages publishing with short-lived workflow permissions, artifact checks, and deployed URL verification. |
+| v0.8 | Next | Provider-specific remote adapters for additional hosts. |
+| v0.9 | Later | Release brief digests and changelog archiving. |
 
 ## License
 

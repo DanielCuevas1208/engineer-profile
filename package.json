@@ -1,6 +1,6 @@
 {
   "name": "engineer-profile",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Self-maintaining engineering portfolio from repository activity",
   "type": "module",
   "main": "dist/index.js",

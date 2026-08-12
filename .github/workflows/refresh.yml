@@ -36,6 +36,11 @@ jobs:
       - name: Refresh portfolio
         run: npm run refresh -- --config engineer-profile.config.json
 
+      - name: Verify refreshed snapshot
+        run: |
+          node scripts/verify-manifest.mjs
+          node scripts/verify-deploy.mjs
+
       - name: Store refreshed site
         uses: actions/upload-artifact@v4
         with:

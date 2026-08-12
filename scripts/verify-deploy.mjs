@@ -19,8 +19,12 @@ try {
 } catch {
   fail("deployed site-manifest.json is invalid");
 }
-if (manifest.projectCount !== 2) {
-  fail(`expected deployed projectCount 2, got ${manifest.projectCount}`);
+if (!Number.isInteger(manifest.projectCount) || manifest.projectCount < 0) {
+  fail(`deployed projectCount is invalid: ${manifest.projectCount}`);
+}
+if (process.env.EXPECTED_PROJECT_COUNT !== undefined &&
+    manifest.projectCount !== Number.parseInt(process.env.EXPECTED_PROJECT_COUNT, 10)) {
+  fail(`expected deployed projectCount ${process.env.EXPECTED_PROJECT_COUNT}, got ${manifest.projectCount}`);
 }
 
 console.log(`Deploy ok: ${DEPLOY_DIR} contains the published snapshot (${manifest.projectCount} projects).`);

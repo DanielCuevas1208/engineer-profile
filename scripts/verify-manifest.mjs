@@ -23,8 +23,12 @@ if (manifest.formatVersion !== 3) {
 if (typeof manifest.projectCount !== "number") {
   fail("projectCount is missing");
 }
-if (manifest.projectCount !== 2) {
-  fail(`expected projectCount 2, got ${manifest.projectCount}`);
+if (!Number.isInteger(manifest.projectCount) || manifest.projectCount < 0) {
+  fail(`projectCount is invalid: ${manifest.projectCount}`);
+}
+if (process.env.EXPECTED_PROJECT_COUNT !== undefined &&
+    manifest.projectCount !== Number.parseInt(process.env.EXPECTED_PROJECT_COUNT, 10)) {
+  fail(`expected projectCount ${process.env.EXPECTED_PROJECT_COUNT}, got ${manifest.projectCount}`);
 }
 if (typeof manifest.owner !== "string" || manifest.owner === "") {
   fail("owner is missing");
@@ -43,6 +47,9 @@ if (!manifest.files.includes("theme-gallery.html")) {
 }
 if (!manifest.files.includes("feed.xml")) {
   fail("files does not list feed.xml");
+}
+if (!Array.isArray(manifest.projects)) {
+  fail("projects is missing");
 }
 for (const project of manifest.projects) {
   if (project.changesFile && !manifest.files.includes(project.changesFile)) {

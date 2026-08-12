@@ -507,7 +507,7 @@ export function publishSite(config: PortfolioConfig): PublishResult {
           description: config.tagline,
           language: "en",
           lastBuildDate: toRfc2822(generatedAt),
-          generator: "engineer-profile/0.6.0",
+          generator: "engineer-profile/0.7.0",
         },
         views.map((view) => {
           const latest = view.changelog[0];
