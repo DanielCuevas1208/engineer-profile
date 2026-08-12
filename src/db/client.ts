@@ -274,6 +274,27 @@ export class PortfolioDatabase {
     }>;
   }
 
+  getCommitsAscending(projectId: number, limit?: number): Array<{
+    sha: string;
+    message: string;
+    author_name: string | null;
+    committed_at: string;
+    url: string;
+  }> {
+    const query = "SELECT sha, message, author_name, committed_at, url FROM commits WHERE project_id = ? ORDER BY committed_at ASC, id ASC";
+    return (
+      limit === undefined
+        ? this.db.prepare(query).all(projectId)
+        : this.db.prepare(`${query} LIMIT ?`).all(projectId, limit)
+    ) as Array<{
+      sha: string;
+      message: string;
+      author_name: string | null;
+      committed_at: string;
+      url: string;
+    }>;
+  }
+
   countCommits(projectId: number): number {
     const row = this.db
       .prepare("SELECT COUNT(*) AS count FROM commits WHERE project_id = ?")

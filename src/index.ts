@@ -1,22 +1,26 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { Command } from "commander";
 import { ingestOwnerRepos, ingestRepository } from "./ingest/orchestrator.js";
 import { captureAllProjects, captureLocalHtml, closeBrowser } from "./preview/capture.js";
-import { copyScreenshotsToOutput, publishSite } from "./publish/site.js";
+import { publishSite } from "./publish/site.js";
 import { loadAllFixtures } from "./fixtures/loader.js";
 import { openDatabase } from "./db/client.js";
 import { DEFAULT_CONFIG, type PortfolioConfig } from "./types.js";
 import { DEFAULT_CONFIG_PATH, loadPortfolioConfig } from "./config/loader.js";
 import { refreshPortfolio } from "./refresh/run.js";
+import { listBuiltinThemes } from "./theme/palette.js";
+import { builtinGalleryThemes, renderThemeGallery } from "./theme/gallery.js";
+import { deployAll, previewAll, type DeployPreview } from "./deploy/index.js";
+import { createDeployReport } from "./deploy/report.js";
 
 const program = new Command();
 
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.2.0");
+  .version("0.7.0");
 
 function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
   const base = options.config
@@ -33,6 +37,17 @@ function resolveConfig(options: { config?: string; data?: string; output?: strin
 
 function addConfigOption(command: Command): Command {
   return command.option("-c, --config <file>", "Configuration file");
+}
+
+function printDeployPreview(preview: DeployPreview): void {
+  console.log(
+    `Preview ${preview.targetName}: ${preview.status} ` +
+      `(${preview.added.length} added, ${preview.changed.length} changed, ` +
+      `${preview.removed.length} removed, ${preview.unchanged} unchanged).`
+  );
+  for (const path of preview.added) console.log(`  + ${path}`);
+  for (const path of preview.changed) console.log(`  ~ ${path}`);
+  for (const path of preview.removed) console.log(`  - ${path}`);
 }
 
 addConfigOption(program
@@ -64,10 +79,11 @@ addConfigOption(program
     }
 
     const result = publishSite(config);
-    const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
-    console.log(`Copied ${copied} available preview screenshots.`);
-    console.log("Open output/index.html in a browser.");
+    console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+    console.log(`Wrote theme gallery to ${result.galleryPath}.`);
+    console.log(`Wrote RSS feed to ${result.feedPath}.`);
+    console.log(`Open ${result.indexPath} in a browser.`);
   }));
 
 addConfigOption(program
@@ -128,9 +144,10 @@ addConfigOption(program
   .action((options) => {
     const config = resolveConfig(options);
     const result = publishSite(config);
-    const copied = copyScreenshotsToOutput(config);
     console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
-    console.log(`Copied ${copied} available preview screenshots.`);
+    console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+    console.log(`Wrote theme gallery to ${result.galleryPath}.`);
+    console.log(`Wrote RSS feed to ${result.feedPath}.`);
   }));
 
 addConfigOption(program
@@ -146,8 +163,95 @@ addConfigOption(program
     console.log(`Captured ${result.captured} project previews.`);
     console.log(`Published ${result.published.projectCount} projects to ${result.published.indexPath}.`);
     console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+    console.log(`Wrote RSS feed to ${result.published.feedPath}.`);
     for (const error of result.captureErrors) {
       console.warn(`Skipped ${error.slug}: ${error.message}`);
+    }
+    for (const deployed of result.deployed) {
+      const state = deployed.verified ? "verified" : "unverified";
+      console.log(`Deployed ${deployed.targetName}: ${deployed.files} files to ${deployed.targetPath} (${state}).`);
+      if (deployed.removed > 0) {
+        console.log(`Removed ${deployed.removed} stale files from ${deployed.targetName}.`);
+      }
+    }
+  }));
+
+program
+  .command("themes")
+  .description("List built-in presentation themes or write a preview gallery")
+  .option("-p, --preview [file]", "Write a theme gallery HTML page")
+  .action((options) => {
+    const themes = listBuiltinThemes();
+    if (options.preview) {
+      const config = existsSync(DEFAULT_CONFIG_PATH)
+        ? loadPortfolioConfig(DEFAULT_CONFIG_PATH)
+        : DEFAULT_CONFIG;
+      const entries = [...builtinGalleryThemes(), { label: "configured", theme: config.theme }];
+      const targetPath = options.preview === true
+        ? join(config.outputDir, "theme-gallery.html")
+        : options.preview;
+      mkdirSync(dirname(targetPath), { recursive: true });
+      writeFileSync(targetPath, renderThemeGallery(entries), "utf-8");
+      console.log(`Wrote theme gallery with ${entries.length} themes to ${targetPath}.`);
+      return;
+    }
+    console.log(`Built-in themes: ${themes.length}`);
+    for (const theme of themes) {
+      console.log(`  ${theme.name}: ${theme.description}`);
+    }
+  });
+
+addConfigOption(program
+  .command("deploy")
+  .description("Publish the snapshot and copy it to configured deploy targets")
+  .option("-d, --data <dir>", "Data directory")
+  .option("-o, --output <dir>", "Output directory")
+  .option("--dry-run", "Preview file changes without syncing targets")
+  .option("--json", "Print a machine-readable deployment report")
+  .action((options) => {
+    const config = resolveConfig(options);
+    mkdirSync(config.dataDir, { recursive: true });
+    const result = publishSite(config);
+    if (!options.json) {
+      console.log(`Published ${result.projectCount} projects to ${result.indexPath}.`);
+      console.log(`Copied ${result.copiedScreenshots} available preview screenshots.`);
+      console.log(`Wrote theme gallery to ${result.galleryPath}.`);
+      console.log(`Wrote RSS feed to ${result.feedPath}.`);
+    }
+    if (options.dryRun) {
+      const previews = previewAll(config);
+      if (options.json) {
+        console.log(JSON.stringify(
+          createDeployReport('preview', result.generatedAt, config.outputDir, previews),
+          null,
+          2
+        ));
+        return;
+      }
+      if (previews.length === 0) {
+        console.log('No deploy targets configured. Add a "deploy.targets" entry to the configuration.');
+      }
+      for (const preview of previews) printDeployPreview(preview);
+      return;
+    }
+    const results = deployAll(config);
+    if (options.json) {
+      console.log(JSON.stringify(
+        createDeployReport('sync', result.generatedAt, config.outputDir, results),
+        null,
+        2
+      ));
+      return;
+    }
+    if (results.length === 0) {
+      console.log('No deploy targets configured. Add a "deploy.targets" entry to the configuration.');
+    }
+    for (const deployed of results) {
+      const state = deployed.verified ? "verified" : "unverified";
+      console.log(`Deployed ${deployed.targetName}: ${deployed.files} files to ${deployed.targetPath} (${state}).`);
+      if (deployed.removed > 0) {
+        console.log(`Removed ${deployed.removed} stale files from ${deployed.targetName}.`);
+      }
     }
   }));
 

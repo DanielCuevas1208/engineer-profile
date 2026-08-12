@@ -1,7 +1,17 @@
-import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { formatChangelogMarkdown } from "../changelog/generator.js";
+import {
+  describeDiffCounts,
+  formatCommitDiffMarkdown,
+  summarizeCommitDiffs,
+  UNRELEASED_VERSION,
+  type CommitDiffSummary,
+} from "../changelog/diff.js";
 import { openDatabase } from "../db/client.js";
+import { resolveTheme, themeVariables, type ThemeTokens } from "../theme/palette.js";
+import { builtinGalleryThemes, renderThemeGallery } from "../theme/gallery.js";
+import { renderRssFeed, toRfc2822 } from "./feed.js";
 import type { ChangelogEntry, PortfolioConfig, ProjectRecord } from "../types.js";
 
 function escapeHtml(text: string): string {
@@ -56,6 +66,20 @@ function parseTopics(value: string): string[] {
   }
 }
 
+function plainText(markdown: string): string {
+  return markdown
+    .replace(/```[^`]*```/g, " ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/[*_~#]/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function pluralize(count: number, singular: string, plural: string): string {
+  return count === 1 ? singular : plural;
+}
+
 function publicAuditDetail(detail: string | null): string {
   if (!detail) return "No detail recorded";
   const separator = detail.indexOf(" -> ");
@@ -76,6 +100,53 @@ function displayDate(value: string): string {
 interface ProjectEvidence {
   commits: number;
   releases: number;
+}
+
+interface ProjectView {
+  project: ProjectRecord;
+  changelog: ChangelogEntry[];
+  evidence: ProjectEvidence;
+  diffs: CommitDiffSummary[];
+}
+
+function commitTrailSummary(summary: CommitDiffSummary): string {
+  const versionLabel =
+    summary.version === UNRELEASED_VERSION
+      ? "Unreleased"
+      : `${summary.title} (${summary.version})`;
+  return `<div class="trail-summary">
+      <span class="trail-version">${escapeHtml(versionLabel)}</span>
+      <span>${summary.commits.length} ${pluralize(summary.commits.length, "commit", "commits")} / ${escapeHtml(describeDiffCounts(summary.counts))}</span>
+    </div>`;
+}
+
+function commitTrailSection(views: ProjectView[]): string {
+  const withDiffs = views.filter((view) => view.diffs.length > 0);
+  const header = `<div class="index-header"><div><p class="eyebrow">Evidence / 03</p><h2>Commit trail</h2></div><p>Commit-diff summaries map stored commits to release windows.</p></div>`;
+  if (withDiffs.length === 0) {
+    return `<section class="commit-trail" id="commit-trail">
+    ${header}
+    <p class="muted">No commit activity is recorded yet. Run ingest, then publish again.</p>
+  </section>`;
+  }
+  const cards = withDiffs
+    .map((view) => {
+      const summaries = view.diffs
+        .slice(0, 4)
+        .map(commitTrailSummary)
+        .join("\n");
+      return `<article class="trail-card">
+      <div class="trail-topline"><span>Project / ${escapeHtml(view.project.language ?? "Repository")}</span><span>${view.diffs.length} ${pluralize(view.diffs.length, "window", "windows")}</span></div>
+      <h3><a href="#${escapeHtml(view.project.slug)}">${escapeHtml(view.project.name)}</a></h3>
+      <div class="trail-summaries">${summaries}</div>
+      <a class="text-link" href="${escapeHtml(view.project.slug)}-changes.md">Commit trail <span aria-hidden="true">-&gt;</span></a>
+    </article>`;
+    })
+    .join("\n");
+  return `<section class="commit-trail" id="commit-trail">
+    ${header}
+    <div class="trail-grid">${cards}</div>
+  </section>`;
 }
 
 function projectCard(
@@ -124,31 +195,17 @@ function projectCard(
   </article>`;
 }
 
-function siteCss(): string {
+function siteCss(theme: ThemeTokens): string {
   return `
-:root {
-  color-scheme: dark;
-  --ink: #08111f;
-  --ink-soft: #0d1a2d;
-  --panel: #112139;
-  --panel-strong: #172a46;
-  --line: rgba(169, 195, 222, 0.18);
-  --text: #f3f7fb;
-  --muted: #9db0c7;
-  --blue: #67b7ff;
-  --blue-soft: #b8dcff;
-  --mint: #a7f3d0;
-  --orange: #ffb86b;
-  --shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
+${themeVariables(theme)}
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; min-width: 320px; background: var(--ink); color: var(--text); line-height: 1.5; }
+body { margin: 0; min-width: 320px; background: var(--ink); color: var(--text); font-family: var(--font); line-height: 1.5; }
 a { color: inherit; }
-.site-shell { min-height: 100vh; background: radial-gradient(circle at 82% -10%, rgba(70, 148, 232, 0.2), transparent 34rem), var(--ink); }
+.site-shell { min-height: 100vh; background: var(--glow), var(--ink); }
 .container { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
 .site-nav { display: flex; justify-content: space-between; align-items: center; padding: 28px 0; border-bottom: 1px solid var(--line); }
+.nav-links { display: flex; gap: 20px; }
 .brand { display: inline-flex; align-items: center; gap: 12px; font: 700 0.9rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-decoration: none; text-transform: uppercase; }
 .brand-mark { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--blue); color: var(--blue); border-radius: 8px; font-size: 0.72rem; }
 .nav-link { color: var(--muted); font: 0.76rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-decoration: none; text-transform: uppercase; }
@@ -158,7 +215,7 @@ a { color: inherit; }
 .kicker { color: var(--mint); margin: 0 0 22px; }
 h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-weight: 650; letter-spacing: -0.08em; line-height: 0.94; }
 .hero-copy { max-width: 530px; margin: 28px 0 0; color: var(--blue-soft); font-size: 1.12rem; }
-.hero-aside { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(145deg, rgba(23, 42, 70, 0.92), rgba(13, 26, 45, 0.72)); box-shadow: var(--shadow); }
+.hero-aside { padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--aside-gradient); box-shadow: var(--shadow); }
 .aside-index { display: flex; justify-content: space-between; color: var(--orange); font: 0.68rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.12em; text-transform: uppercase; }
 .hero-aside p { margin: 24px 0 4px; color: var(--text); font-size: 1rem; }
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -166,19 +223,19 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 .stat:last-child { border-right: 0; }
 .stat strong { display: block; color: var(--text); font-size: 1.8rem; font-weight: 600; letter-spacing: -0.04em; }
 .stat span { color: var(--muted); font: 0.7rem/1.3 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-transform: uppercase; }
-.audit-panel { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; margin: 26px 0 80px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px; background: rgba(17, 33, 57, 0.66); }
+.audit-panel { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; margin: 26px 0 80px; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--audit-bg); }
 .audit-copy { color: var(--muted); font-size: 0.88rem; }
 .audit-copy strong { color: var(--text); font-weight: 500; }
 .audit-time { color: var(--blue); font: 0.7rem/1.4 "SFMono-Regular", Consolas, monospace; text-align: right; }
 .index-header { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 24px; }
 .index-header h2 { margin: 0; font-size: 2rem; font-weight: 550; letter-spacing: -0.05em; }
 .index-header p { max-width: 350px; margin: 0; color: var(--muted); font-size: 0.88rem; text-align: right; }
-.project-card { display: grid; grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr); overflow: hidden; margin-bottom: 24px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(135deg, rgba(23, 42, 70, 0.98), rgba(13, 26, 45, 0.96)); box-shadow: var(--shadow); }
-.project-visual { position: relative; min-height: 310px; background: #0a1525; }
+.project-card { display: grid; grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr); overflow: hidden; margin-bottom: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-gradient); box-shadow: var(--shadow); }
+.project-visual { position: relative; min-height: 310px; background: var(--visual); }
 .screenshot { display: block; width: 100%; height: 100%; min-height: 310px; object-fit: cover; opacity: 0.9; }
-.placeholder { display: flex; min-height: 310px; align-items: center; justify-content: center; flex-direction: column; gap: 7px; color: var(--blue); background: repeating-linear-gradient(135deg, rgba(103, 183, 255, 0.05), rgba(103, 183, 255, 0.05) 1px, transparent 1px, transparent 14px); }
+.placeholder { display: flex; min-height: 310px; align-items: center; justify-content: center; flex-direction: column; gap: 7px; color: var(--blue); background: repeating-linear-gradient(135deg, var(--stripe), var(--stripe) 1px, transparent 1px, transparent 14px); }
 .placeholder small { color: var(--muted); font: 0.68rem/1 "SFMono-Regular", Consolas, monospace; text-transform: uppercase; }
-.visual-label { position: absolute; right: 16px; bottom: 16px; padding: 7px 9px; border: 1px solid rgba(255,255,255,0.18); border-radius: 5px; background: rgba(8, 17, 31, 0.72); color: var(--blue-soft); }
+.visual-label { position: absolute; right: 16px; bottom: 16px; padding: 7px 9px; border: 1px solid var(--label-border); border-radius: 5px; background: var(--label-bg); color: var(--blue-soft); }
 .project-body { padding: 30px 34px 32px; }
 .card-topline { display: flex; justify-content: space-between; gap: 12px; color: var(--blue); }
 .project-body h2 { margin: 18px 0 8px; font-size: 2.1rem; font-weight: 560; letter-spacing: -0.06em; }
@@ -187,7 +244,7 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 .facts { display: flex; flex-wrap: wrap; gap: 22px; margin: 24px 0 16px; color: var(--muted); font: 0.76rem/1 "SFMono-Regular", Consolas, monospace; }
 .facts strong { color: var(--text); font-size: 1rem; font-weight: 600; }
 .tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 26px; }
-.tag { padding: 5px 9px; border: 1px solid rgba(167, 243, 208, 0.26); border-radius: 999px; color: var(--mint); font: 0.68rem/1 "SFMono-Regular", Consolas, monospace; }
+.tag { padding: 5px 9px; border: 1px solid var(--tag-border); border-radius: 999px; color: var(--mint); background: var(--tag-bg); font: 0.68rem/1 "SFMono-Regular", Consolas, monospace; }
 .change-log { padding: 18px 0 20px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .section-heading { display: flex; justify-content: space-between; color: var(--orange); }
 .source-badge { color: var(--muted); }
@@ -197,20 +254,29 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 .change-preview h3, .change-preview h4 { margin: 12px 0 4px; color: var(--text); font-size: 0.78rem; font-weight: 600; }
 .change-preview p { margin: 3px 0; }
 .change-preview li { margin: 3px 0 3px 18px; }
-.change-preview code { padding: 2px 4px; border-radius: 3px; color: var(--mint); background: rgba(167, 243, 208, 0.08); font: 0.76rem "SFMono-Regular", Consolas, monospace; }
+.change-preview code { padding: 2px 4px; border-radius: 3px; color: var(--mint); background: var(--code-bg); font: 0.76rem "SFMono-Regular", Consolas, monospace; }
 .text-link { display: inline-block; margin-top: 14px; color: var(--blue); font: 0.73rem/1 "SFMono-Regular", Consolas, monospace; text-decoration: none; text-transform: uppercase; }
 .card-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
 .button { display: inline-block; padding: 10px 14px; border-radius: 7px; font: 0.72rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.04em; text-decoration: none; text-transform: uppercase; }
-.button.primary { background: var(--blue); color: var(--ink); }
+.button.primary { background: var(--blue); color: var(--button-text); }
 .button.primary:hover { background: var(--blue-soft); }
 .button.secondary { border: 1px solid var(--line); color: var(--text); }
 .button.secondary:hover { border-color: var(--blue); color: var(--blue); }
 .muted { color: var(--muted); }
+.commit-trail { margin: 80px 0; }
+.trail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+.trail-card { padding: 22px 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-gradient); box-shadow: var(--shadow); }
+.trail-topline { display: flex; justify-content: space-between; gap: 12px; color: var(--blue); font: 0.66rem/1.4 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.1em; text-transform: uppercase; }
+.trail-card h3 { margin: 14px 0 12px; font-size: 1.15rem; font-weight: 560; letter-spacing: -0.03em; }
+.trail-card h3 a { text-decoration: none; }
+.trail-summaries { display: grid; gap: 8px; margin-bottom: 14px; }
+.trail-summary { display: flex; justify-content: space-between; gap: 12px; padding: 9px 11px; border: 1px solid var(--line-soft); border-radius: 7px; background: var(--audit-bg); color: var(--muted); font: 0.7rem/1.4 "SFMono-Regular", Consolas, monospace; }
+.trail-version { color: var(--mint); }
 .source-trail { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 36px; margin: 80px 0; padding: 26px 0; border-top: 1px solid var(--line); }
 .source-trail h2 { margin: 0 0 8px; font-size: 1.2rem; font-weight: 550; }
 .source-trail p { margin: 0; color: var(--muted); font-size: 0.86rem; }
 .audit-list { margin: 0; padding: 0; list-style: none; }
-.audit-list li { display: grid; grid-template-columns: 150px 72px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(169, 195, 222, 0.1); color: var(--muted); font: 0.72rem/1.4 "SFMono-Regular", Consolas, monospace; }
+.audit-list li { display: grid; grid-template-columns: 150px 72px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); color: var(--muted); font: 0.72rem/1.4 "SFMono-Regular", Consolas, monospace; }
 .audit-list time { color: var(--blue); }
 .audit-list strong { color: var(--orange); font-weight: 500; text-transform: uppercase; }
 .site-footer { display: flex; justify-content: space-between; gap: 20px; padding: 24px 0 40px; border-top: 1px solid var(--line); color: var(--muted); font: 0.7rem/1.4 "SFMono-Regular", Consolas, monospace; }
@@ -239,10 +305,58 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 `;
 }
 
+export interface SiteManifestProject {
+  slug: string;
+  name: string;
+  url: string;
+  changelogFile: string | null;
+  changesFile: string | null;
+}
+
+export interface SiteManifest {
+  formatVersion: 3;
+  generatedAt: string;
+  title: string;
+  owner: string;
+  theme: {
+    name: string;
+    mode: string;
+    accent: string;
+    radius: string;
+    font: string;
+  };
+  feed: string;
+  projectCount: number;
+  projects: SiteManifestProject[];
+  files: string[];
+  screenshots: string[];
+}
+
 export interface PublishResult {
   indexPath: string;
+  manifestPath: string;
+  galleryPath: string;
+  feedPath: string;
   projectCount: number;
   generatedAt: string;
+  theme: string;
+  copiedScreenshots: number;
+}
+
+function relativePosixPaths(outputDir: string): string[] {
+  const paths: string[] = [];
+  const walk = (current: string, prefix: string): void => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        walk(join(current, entry.name), relative);
+      } else {
+        paths.push(relative);
+      }
+    }
+  };
+  walk(outputDir, "");
+  return paths.sort();
 }
 
 export function publishSite(config: PortfolioConfig): PublishResult {
@@ -250,14 +364,31 @@ export function publishSite(config: PortfolioConfig): PublishResult {
   try {
     const projects = db.listProjects(true);
     const generatedAt = config.clock();
-    const views = projects.map((project) => ({
-      project,
-      changelog: db.getChangelog(project.id),
-      evidence: {
-        commits: db.countCommits(project.id),
-        releases: db.countReleases(project.id),
-      },
-    }));
+    const theme = resolveTheme(config.theme);
+    const views = projects.map((project) => {
+      const changelog = db.getChangelog(project.id);
+      const commits = db.getCommitsAscending(project.id);
+      return {
+        project,
+        changelog,
+        evidence: {
+          commits: db.countCommits(project.id),
+          releases: db.countReleases(project.id),
+        },
+        diffs: summarizeCommitDiffs(
+          commits.map((commit) => ({
+            sha: commit.sha,
+            message: commit.message,
+            committed_at: commit.committed_at,
+          })),
+          changelog.map((entry) => ({
+            version: entry.version,
+            title: entry.title,
+            published_at: entry.published_at,
+          }))
+        ),
+      };
+    });
     const totalStars = projects.reduce((sum, project) => sum + project.stars, 0);
     const totalCommits = views.reduce((sum, view) => sum + view.evidence.commits, 0);
     const releaseNotes = views.reduce((sum, view) => sum + view.evidence.releases, 0);
@@ -279,14 +410,19 @@ export function publishSite(config: PortfolioConfig): PublishResult {
   <meta name="description" content="${escapeHtml(config.tagline)}" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'" />
   <title>${escapeHtml(config.title)} / Portfolio</title>
-  <style>${siteCss()}</style>
+  <link rel="alternate" type="application/rss+xml" title="${escapeHtml(config.title)} Feed" href="feed.xml" />
+  <style>${siteCss(theme)}</style>
 </head>
 <body>
   <div class="site-shell">
     <div class="container">
       <nav class="site-nav" aria-label="Primary navigation">
         <a class="brand" href="#top"><span class="brand-mark">EP</span><span>${escapeHtml(config.title)}</span></a>
-        <a class="nav-link" href="#source-trail">Source trail -&gt;</a>
+        <div class="nav-links">
+          <a class="nav-link" href="#commit-trail">Commit trail -&gt;</a>
+          <a class="nav-link" href="#source-trail">Source trail -&gt;</a>
+          <a class="nav-link" href="feed.xml">Feed -&gt;</a>
+        </div>
       </nav>
       <header class="hero" id="top">
         <div>
@@ -295,7 +431,7 @@ export function publishSite(config: PortfolioConfig): PublishResult {
           <p class="hero-copy">${escapeHtml(config.tagline)}. Each project stays connected to its repository, commits, releases, and preview.</p>
         </div>
         <aside class="hero-aside">
-          <div class="aside-index"><span>Profile / ${escapeHtml(config.owner)}</span><span>Local build</span></div>
+          <div class="aside-index"><span>Profile / ${escapeHtml(config.owner)}</span><span>Theme / ${escapeHtml(theme.name)}</span></div>
           <p>Facts stay close to their sources. Privacy choices stay close to the database.</p>
         </aside>
       </header>
@@ -314,8 +450,9 @@ export function publishSite(config: PortfolioConfig): PublishResult {
         ${visibleProjects}
         ${cards}
       </main>
+      ${commitTrailSection(views)}
       <section class="source-trail" id="source-trail">
-        <div><p class="eyebrow">Audit / 03</p><h2>Refresh trail</h2><p>EngineerProfile records each ingest, capture, and publish operation locally.</p></div>
+        <div><p class="eyebrow">Audit / 04</p><h2>Refresh trail</h2><p>EngineerProfile records each ingest, capture, and publish operation locally.</p></div>
         <ol class="audit-list">${auditItems}</ol>
       </section>
       <footer class="site-footer"><p>${escapeHtml(config.title)} / local publisher</p><p>Public output contains visible projects only. No invented metrics.</p></footer>
@@ -344,8 +481,98 @@ export function publishSite(config: PortfolioConfig): PublishResult {
       writeFileSync(join(config.outputDir, `${view.project.slug}-changelog.md`), markdown, "utf-8");
     }
 
+    for (const view of views) {
+      if (view.diffs.length === 0) continue;
+      const markdown = formatCommitDiffMarkdown(view.project.name, view.diffs);
+      writeFileSync(join(config.outputDir, `${view.project.slug}-changes.md`), markdown, "utf-8");
+    }
+
+    const copiedScreenshots = copyScreenshotsToOutput(config);
+
+    const galleryPath = join(config.outputDir, "theme-gallery.html");
+    const galleryEntries = [
+      ...builtinGalleryThemes(),
+      { label: "configured", theme: config.theme },
+    ];
+    writeFileSync(galleryPath, renderThemeGallery(galleryEntries), "utf-8");
+
+    const baseUrl = (config.feed.baseUrl ?? `https://github.com/${config.owner}`).replace(/\/+$/, "");
+    const feedPath = join(config.outputDir, "feed.xml");
+    writeFileSync(
+      feedPath,
+      renderRssFeed(
+        {
+          title: config.title,
+          link: baseUrl,
+          description: config.tagline,
+          language: "en",
+          lastBuildDate: toRfc2822(generatedAt),
+          generator: "engineer-profile/0.7.0",
+        },
+        views.map((view) => {
+          const latest = view.changelog[0];
+          const link = safeExternalUrl(view.project.url) ?? baseUrl;
+          const descriptionParts: string[] = [];
+          if (view.project.description) descriptionParts.push(view.project.description);
+          if (latest) {
+            descriptionParts.push(`${latest.title} (${latest.version})`);
+            descriptionParts.push(plainText(latest.body).slice(0, 400));
+          }
+          return {
+            title: view.project.name,
+            link,
+            guid: `${link}#${view.project.slug}`,
+            description:
+              descriptionParts.join(" / ").slice(0, 500) || "No description provided.",
+            pubDate: view.project.last_pushed
+              ? toRfc2822(view.project.last_pushed)
+              : toRfc2822(generatedAt),
+            categories: parseTopics(view.project.topics).slice(0, 5),
+          };
+        })
+      ),
+      "utf-8"
+    );
+
+    const publishedFiles = relativePosixPaths(config.outputDir);
+    const manifest: SiteManifest = {
+      formatVersion: 3,
+      generatedAt,
+      title: config.title,
+      owner: config.owner,
+      theme: {
+        name: theme.name,
+        mode: theme.mode,
+        accent: theme.blue,
+        radius: theme.radius,
+        font: theme.font,
+      },
+      feed: "feed.xml",
+      projectCount: projects.length,
+      projects: views.map((view) => ({
+        slug: view.project.slug,
+        name: view.project.name,
+        url: view.project.url,
+        changelogFile: view.changelog.length > 0 ? `${view.project.slug}-changelog.md` : null,
+        changesFile: view.diffs.length > 0 ? `${view.project.slug}-changes.md` : null,
+      })),
+      files: [...new Set([...publishedFiles, "site-manifest.json"])].sort(),
+      screenshots: publishedFiles.filter((file) => file.startsWith("assets/screenshots/")),
+    };
+    const manifestPath = join(config.outputDir, "site-manifest.json");
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
+
     db.logIngest("publish", `${projects.length} projects -> ${indexPath}`);
-    return { indexPath, projectCount: projects.length, generatedAt };
+    return {
+      indexPath,
+      manifestPath,
+      galleryPath,
+      feedPath,
+      projectCount: projects.length,
+      generatedAt,
+      theme: theme.name,
+      copiedScreenshots,
+    };
   } finally {
     db.close();
   }
