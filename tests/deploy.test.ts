@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { deployAll, deployToTarget, previewAll, previewToTarget } from "../src/deploy/index.js";
+import {
+  deployAll,
+  deployToTarget,
+  isSupportedAdapter,
+  listSupportedAdapters,
+  previewAll,
+  previewToTarget,
+} from "../src/deploy/index.js";
 import { openDatabase } from "../src/db/client.js";
 import { digestSnapshot } from "../src/deploy/snapshot.js";
 import { DEFAULT_CONFIG } from "../src/types.js";
@@ -197,5 +204,51 @@ describe("deploy adapters", () => {
 
     const targetFiles = readdirSync(join(TEST_TARGET, "assets", "screenshots"));
     expect(targetFiles).toContain("demo-engineer-signal-router.png");
+  });
+
+  it("lists all supported remote and local deploy adapters", () => {
+    const adapters = listSupportedAdapters();
+    expect(adapters).toEqual(["local", "s3", "netlify", "vercel", "rsync"]);
+    expect(isSupportedAdapter("local")).toBe(true);
+    expect(isSupportedAdapter("s3")).toBe(true);
+    expect(isSupportedAdapter("netlify")).toBe(true);
+    expect(isSupportedAdapter("vercel")).toBe(true);
+    expect(isSupportedAdapter("rsync")).toBe(true);
+    expect(isSupportedAdapter("unknown")).toBe(false);
+  });
+
+  it("dispatches deploy and preview to mixed target types", () => {
+    writePublishedSite();
+    const config = {
+      ...publishedConfig(),
+      deploy: {
+        targets: [
+          { name: "local-target", type: "local" as const, target: TEST_TARGET },
+          { name: "s3-target", type: "s3" as const, bucket: "test-bucket", target: join("deploy", "test-s3") },
+          { name: "netlify-target", type: "netlify" as const, siteId: "net-123", target: join("deploy", "test-net") },
+          { name: "vercel-target", type: "vercel" as const, projectId: "ver-123", target: join("deploy", "test-ver") },
+          { name: "rsync-target", type: "rsync" as const, host: "h.io", path: "/w", target: join("deploy", "test-rsync") },
+        ],
+      },
+    };
+
+    const previews = previewAll(config);
+    expect(previews).toHaveLength(5);
+    expect(previews[0].targetName).toBe("local-target");
+    expect(previews[1].targetName).toBe("s3-target");
+    expect(previews[2].targetName).toBe("netlify-target");
+    expect(previews[3].targetName).toBe("vercel-target");
+    expect(previews[4].targetName).toBe("rsync-target");
+
+    const results = deployAll(config);
+    expect(results).toHaveLength(5);
+    for (const res of results) {
+      expect(res.verified).toBe(true);
+    }
+
+    rmSync(join("deploy", "test-s3"), { recursive: true, force: true });
+    rmSync(join("deploy", "test-net"), { recursive: true, force: true });
+    rmSync(join("deploy", "test-ver"), { recursive: true, force: true });
+    rmSync(join("deploy", "test-rsync"), { recursive: true, force: true });
   });
 });

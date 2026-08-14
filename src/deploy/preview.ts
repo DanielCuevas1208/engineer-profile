@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import type { DeployTarget, PortfolioConfig } from "../types.js";
+import type { LocalDeployTarget, PortfolioConfig } from "../types.js";
 import { compareSnapshots, type SnapshotDiff } from "./snapshot.js";
 
 export interface DeployPreview extends SnapshotDiff {
@@ -13,7 +13,7 @@ function isPathInside(parent: string, child: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-function validatePreview(config: PortfolioConfig, target: DeployTarget): { outputRoot: string; targetRoot: string } {
+function validatePreview(config: PortfolioConfig, target: LocalDeployTarget): { outputRoot: string; targetRoot: string } {
   const outputRoot = resolve(config.outputDir);
   const targetRoot = resolve(target.target);
   if (!existsSync(join(config.outputDir, "index.html"))) {
@@ -30,7 +30,7 @@ function validatePreview(config: PortfolioConfig, target: DeployTarget): { outpu
   return { outputRoot, targetRoot };
 }
 
-export function previewLocal(config: PortfolioConfig, target: DeployTarget): DeployPreview {
+export function previewLocal(config: PortfolioConfig, target: LocalDeployTarget): DeployPreview {
   const { outputRoot, targetRoot } = validatePreview(config, target);
   return {
     targetName: target.name,

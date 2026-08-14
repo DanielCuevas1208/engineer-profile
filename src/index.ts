@@ -12,7 +12,7 @@ import { DEFAULT_CONFIG_PATH, loadPortfolioConfig } from "./config/loader.js";
 import { refreshPortfolio } from "./refresh/run.js";
 import { listBuiltinThemes } from "./theme/palette.js";
 import { builtinGalleryThemes, renderThemeGallery } from "./theme/gallery.js";
-import { deployAll, previewAll, type DeployPreview } from "./deploy/index.js";
+import { deployAll, deployToTarget, previewAll, previewToTarget, type DeployPreview } from "./deploy/index.js";
 import { createDeployReport } from "./deploy/report.js";
 
 const program = new Command();
@@ -20,7 +20,7 @@ const program = new Command();
 program
   .name("engineer-profile")
   .description("Build a local engineering portfolio from public repository evidence")
-  .version("0.7.0");
+  .version("0.8.0");
 
 function resolveConfig(options: { config?: string; data?: string; output?: string }): PortfolioConfig {
   const base = options.config
@@ -206,6 +206,7 @@ addConfigOption(program
   .description("Publish the snapshot and copy it to configured deploy targets")
   .option("-d, --data <dir>", "Data directory")
   .option("-o, --output <dir>", "Output directory")
+  .option("-t, --target <name>", "Deploy to a specific target by name")
   .option("--dry-run", "Preview file changes without syncing targets")
   .option("--json", "Print a machine-readable deployment report")
   .action((options) => {
@@ -218,8 +219,19 @@ addConfigOption(program
       console.log(`Wrote theme gallery to ${result.galleryPath}.`);
       console.log(`Wrote RSS feed to ${result.feedPath}.`);
     }
+
+    const targets = options.target
+      ? config.deploy.targets.filter((t) => t.name === options.target)
+      : config.deploy.targets;
+
+    if (options.target && targets.length === 0) {
+      throw new Error(`Target "${options.target}" not found in configured deploy targets.`);
+    }
+
     if (options.dryRun) {
-      const previews = previewAll(config);
+      const previews = options.target
+        ? targets.map((target) => previewToTarget(config, target))
+        : previewAll(config);
       if (options.json) {
         console.log(JSON.stringify(
           createDeployReport('preview', result.generatedAt, config.outputDir, previews),
@@ -234,7 +246,9 @@ addConfigOption(program
       for (const preview of previews) printDeployPreview(preview);
       return;
     }
-    const results = deployAll(config);
+    const results = options.target
+      ? targets.map((target) => deployToTarget(config, target))
+      : deployAll(config);
     if (options.json) {
       console.log(JSON.stringify(
         createDeployReport('sync', result.generatedAt, config.outputDir, results),
@@ -270,6 +284,19 @@ addConfigOption(program
       for (const project of all) {
         const state = project.visible ? "visible" : "hidden";
         console.log(`  ${project.slug} [${state}] - ${project.stars} stars - ${db.countCommits(project.id)} commits`);
+      }
+      if (config.deploy.targets.length) {
+        console.log(`\nDeploy targets: ${config.deploy.targets.length}`);
+        for (const target of config.deploy.targets) {
+          const dest = target.type === "local"
+            ? target.target
+            : target.type === "s3"
+              ? `s3://${target.bucket}${target.prefix ? `/${target.prefix}` : ""}`
+              : target.type === "rsync"
+                ? `${target.user ? `${target.user}@` : ""}${target.host}:${target.path}`
+                : `${target.type}://${target.name}`;
+          console.log(`  ${target.name} [${target.type}] -> ${dest}`);
+        }
       }
       const log = db.getIngestLog(5);
       if (log.length) {

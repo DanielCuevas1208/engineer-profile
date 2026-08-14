@@ -85,11 +85,72 @@ export interface ThemeConfig {
   font?: string;
 }
 
-export interface DeployTarget {
+export type DeployTargetType = "local" | "s3" | "netlify" | "vercel" | "rsync";
+
+export interface LocalDeployTarget {
   name: string;
   type: "local";
   target: string;
 }
+
+export interface S3DeployTarget {
+  name: string;
+  type: "s3";
+  bucket: string;
+  region?: string;
+  prefix?: string;
+  endpoint?: string;
+  target?: string;
+}
+
+export interface NetlifyHeaderRule {
+  for: string;
+  values: Record<string, string>;
+}
+
+export interface NetlifyRedirectRule {
+  from: string;
+  to: string;
+  status?: number;
+  force?: boolean;
+}
+
+export interface NetlifyDeployTarget {
+  name: string;
+  type: "netlify";
+  siteId?: string;
+  target?: string;
+  publishDir?: string;
+  headers?: NetlifyHeaderRule[];
+  redirects?: NetlifyRedirectRule[];
+}
+
+export interface VercelDeployTarget {
+  name: string;
+  type: "vercel";
+  projectId?: string;
+  target?: string;
+  cleanUrls?: boolean;
+  trailingSlash?: boolean;
+}
+
+export interface RsyncDeployTarget {
+  name: string;
+  type: "rsync";
+  host: string;
+  user?: string;
+  path: string;
+  port?: number;
+  delete?: boolean;
+  target?: string;
+}
+
+export type DeployTarget =
+  | LocalDeployTarget
+  | S3DeployTarget
+  | NetlifyDeployTarget
+  | VercelDeployTarget
+  | RsyncDeployTarget;
 
 export interface DeployConfig {
   targets: DeployTarget[];

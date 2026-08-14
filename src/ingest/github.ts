@@ -15,7 +15,7 @@ export class GitHubClient {
   private headers(): Record<string, string> {
     const headers: Record<string, string> = {
       Accept: "application/vnd.github+json",
-      "User-Agent": "engineer-profile/0.1.0",
+      "User-Agent": "engineer-profile/0.8.0",
     };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
     return headers;

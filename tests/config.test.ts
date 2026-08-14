@@ -99,14 +99,78 @@ describe("portfolio configuration", () => {
     );
   });
 
+  it("loads s3, netlify, vercel, and rsync deploy settings", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({
+      deploy: {
+        targets: [
+          { name: "s3-prod", type: "s3", bucket: "portfolio-bucket", region: "eu-central-1", prefix: "docs" },
+          { name: "netlify-preview", type: "netlify", siteId: "site-123" },
+          { name: "vercel-prod", type: "vercel", projectId: "prj-456", cleanUrls: true },
+          { name: "rsync-backup", type: "rsync", host: "backup.example.com", path: "/srv/backup", port: 2222 },
+        ],
+      },
+    }));
+
+    const config = loadPortfolioConfig(TEST_FILE);
+    expect(config.deploy.targets).toHaveLength(4);
+    expect(config.deploy.targets[0]).toEqual({
+      name: "s3-prod",
+      type: "s3",
+      bucket: "portfolio-bucket",
+      region: "eu-central-1",
+      prefix: "docs",
+    });
+    expect(config.deploy.targets[1]).toEqual({
+      name: "netlify-preview",
+      type: "netlify",
+      siteId: "site-123",
+    });
+    expect(config.deploy.targets[2]).toEqual({
+      name: "vercel-prod",
+      type: "vercel",
+      projectId: "prj-456",
+      cleanUrls: true,
+    });
+    expect(config.deploy.targets[3]).toEqual({
+      name: "rsync-backup",
+      type: "rsync",
+      host: "backup.example.com",
+      path: "/srv/backup",
+      port: 2222,
+    });
+  });
+
   it("rejects unsupported deploy adapter types", () => {
     mkdirSync(TEST_DIR, { recursive: true });
     writeFileSync(TEST_FILE, JSON.stringify({
-      deploy: { targets: [{ name: "netlify", type: "remote", target: "x" }] },
+      deploy: { targets: [{ name: "ftp-target", type: "ftp", target: "x" }] },
     }));
 
     expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
-      'Configuration field "deploy.targets[0].type" must be "local".'
+      'Configuration field "deploy.targets[0].type" must be one of: local, s3, netlify, vercel, rsync.'
+    );
+  });
+
+  it("rejects invalid S3 bucket names in configuration", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({
+      deploy: { targets: [{ name: "bad-s3", type: "s3", bucket: "INVALID_BUCKET_NAME" }] },
+    }));
+
+    expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
+      'Configuration field "deploy.targets[0].bucket" must be a valid S3 bucket name.'
+    );
+  });
+
+  it("rejects invalid rsync ports in configuration", () => {
+    mkdirSync(TEST_DIR, { recursive: true });
+    writeFileSync(TEST_FILE, JSON.stringify({
+      deploy: { targets: [{ name: "bad-rsync", type: "rsync", host: "example.com", path: "/var/www", port: 99999 }] },
+    }));
+
+    expect(() => loadPortfolioConfig(TEST_FILE)).toThrow(
+      'Configuration field "deploy.targets[0].port" must be an integer from 1 to 65535.'
     );
   });
 });
