@@ -1,41 +1,31 @@
-import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { openDatabase } from "../db/client.js";
-import type { DeployTarget, PortfolioConfig } from "../types.js";
+import type { LocalDeployTarget, PortfolioConfig } from "../types.js";
+import { digestSnapshot, listSnapshotPaths } from "./snapshot.js";
 
 export interface DeployResult {
   targetName: string;
   targetPath: string;
   files: number;
+  removed: number;
+  verified: boolean;
+  sourceDigest: string | null;
+  targetDigest: string | null;
 }
 
-export function isPathInside(parent: string, child: string): boolean {
+function isPathInside(parent: string, child: string): boolean {
   const rel = relative(parent, child);
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-function countFiles(targetPath: string): number {
-  let total = 0;
-  const walk = (current: string): void => {
-    for (const entry of readdirSync(current, { withFileTypes: true })) {
-      if (entry.isDirectory()) {
-        walk(join(current, entry.name));
-      } else {
-        total++;
-      }
-    }
-  };
-  walk(targetPath);
-  return total;
-}
-
 export function deployLocal(
   config: PortfolioConfig,
-  target: DeployTarget
+  target: LocalDeployTarget
 ): DeployResult {
   const indexPath = join(config.outputDir, "index.html");
   if (!existsSync(indexPath)) {
-    throw new Error(`No published site found in "${config.outputDir}". Run publish first.`);
+    throw new Error(`No published site found at "${config.outputDir}". Run publish first.`);
   }
 
   const outputRoot = resolve(config.outputDir);
@@ -47,15 +37,40 @@ export function deployLocal(
   }
 
   mkdirSync(target.target, { recursive: true });
-  cpSync(config.outputDir, target.target, { recursive: true });
-  const files = countFiles(target.target);
+  const outputFiles = listSnapshotPaths(outputRoot);
+  const existingFiles = listSnapshotPaths(targetRoot);
+
+  let removed = 0;
+  for (const relative of existingFiles) {
+    if (outputFiles.includes(relative)) continue;
+    rmSync(join(targetRoot, relative), { force: true });
+    removed++;
+  }
+
+  cpSync(config.outputDir, target.target, { recursive: true, force: true });
+  const files = listSnapshotPaths(targetRoot).length;
+  const hasRequiredFiles =
+    existsSync(join(targetRoot, "index.html")) &&
+    existsSync(join(targetRoot, "site-manifest.json"));
+  const sourceDigest = digestSnapshot(outputRoot);
+  const targetDigest = digestSnapshot(targetRoot);
+  const verified = hasRequiredFiles && sourceDigest === targetDigest;
 
   const db = openDatabase(config.dataDir, config.clock);
   try {
-    db.logIngest("deploy", `${target.name} -> ${target.target}`);
+    const detail = `${target.name} -> ${target.target} (${files} files, ${removed} removed, ${verified ? "verified" : "unverified"})`;
+    db.logIngest("deploy", detail);
   } finally {
     db.close();
   }
 
-  return { targetName: target.name, targetPath: target.target, files };
+  return {
+    targetName: target.name,
+    targetPath: target.target,
+    files,
+    removed,
+    verified,
+    sourceDigest,
+    targetDigest,
+  };
 }

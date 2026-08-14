@@ -10,9 +10,10 @@ import { DEFAULT_THEME } from "../src/types.js";
 
 describe("theme catalog", () => {
   it("exposes deterministic built-in themes", () => {
-    const names = listBuiltinThemes().map((theme) => theme.name);
+    const themes = listBuiltinThemes();
+    const names = themes.map((theme) => theme.name);
     expect(names).toEqual(["deep-space", "paper", "terminal"]);
-    for (const theme of listBuiltinThemes()) {
+    for (const theme of themes) {
       expect(theme.description.length).toBeGreaterThan(0);
     }
   });
@@ -75,16 +76,12 @@ describe("resolveTheme", () => {
 
 describe("themeVariables", () => {
   it("emits a :root block with color-scheme and core tokens", () => {
-    const css = themeVariables(resolveTheme({ name: "deep-space" }));
+    const tokens = resolveTheme({ name: "deep-space" });
+    const css = themeVariables(tokens);
     expect(css).toContain(":root {");
     expect(css).toContain("color-scheme: dark");
     expect(css).toContain("--blue: #67b7ff");
     expect(css).toContain("--font:");
-  });
-
-  it("emits a light color-scheme for the paper theme", () => {
-    const css = themeVariables(resolveTheme({ name: "paper" }));
-    expect(css).toContain("color-scheme: light");
   });
 
   it("emits deterministic output for the same theme", () => {

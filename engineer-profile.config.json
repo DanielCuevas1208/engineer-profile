@@ -13,7 +13,7 @@
       {
         "name": "public",
         "type": "local",
-        "target": "deploy/site"
+        "target": "deploy/public"
       }
     ]
   },

@@ -1,8 +1,17 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { formatChangelogMarkdown } from "../changelog/generator.js";
-import { openDatabase, type PortfolioDatabase } from "../db/client.js";
+import {
+  describeDiffCounts,
+  formatCommitDiffMarkdown,
+  summarizeCommitDiffs,
+  UNRELEASED_VERSION,
+  type CommitDiffSummary,
+} from "../changelog/diff.js";
+import { openDatabase } from "../db/client.js";
 import { resolveTheme, themeVariables, type ThemeTokens } from "../theme/palette.js";
+import { builtinGalleryThemes, renderThemeGallery } from "../theme/gallery.js";
+import { renderRssFeed, toRfc2822 } from "./feed.js";
 import type { ChangelogEntry, PortfolioConfig, ProjectRecord } from "../types.js";
 
 function escapeHtml(text: string): string {
@@ -57,6 +66,20 @@ function parseTopics(value: string): string[] {
   }
 }
 
+function plainText(markdown: string): string {
+  return markdown
+    .replace(/```[^`]*```/g, " ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/[*_~#]/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function pluralize(count: number, singular: string, plural: string): string {
+  return count === 1 ? singular : plural;
+}
+
 function publicAuditDetail(detail: string | null): string {
   if (!detail) return "No detail recorded";
   const separator = detail.indexOf(" -> ");
@@ -77,6 +100,53 @@ function displayDate(value: string): string {
 interface ProjectEvidence {
   commits: number;
   releases: number;
+}
+
+interface ProjectView {
+  project: ProjectRecord;
+  changelog: ChangelogEntry[];
+  evidence: ProjectEvidence;
+  diffs: CommitDiffSummary[];
+}
+
+function commitTrailSummary(summary: CommitDiffSummary): string {
+  const versionLabel =
+    summary.version === UNRELEASED_VERSION
+      ? "Unreleased"
+      : `${summary.title} (${summary.version})`;
+  return `<div class="trail-summary">
+      <span class="trail-version">${escapeHtml(versionLabel)}</span>
+      <span>${summary.commits.length} ${pluralize(summary.commits.length, "commit", "commits")} / ${escapeHtml(describeDiffCounts(summary.counts))}</span>
+    </div>`;
+}
+
+function commitTrailSection(views: ProjectView[]): string {
+  const withDiffs = views.filter((view) => view.diffs.length > 0);
+  const header = `<div class="index-header"><div><p class="eyebrow">Evidence / 03</p><h2>Commit trail</h2></div><p>Commit-diff summaries map stored commits to release windows.</p></div>`;
+  if (withDiffs.length === 0) {
+    return `<section class="commit-trail" id="commit-trail">
+    ${header}
+    <p class="muted">No commit activity is recorded yet. Run ingest, then publish again.</p>
+  </section>`;
+  }
+  const cards = withDiffs
+    .map((view) => {
+      const summaries = view.diffs
+        .slice(0, 4)
+        .map(commitTrailSummary)
+        .join("\n");
+      return `<article class="trail-card">
+      <div class="trail-topline"><span>Project / ${escapeHtml(view.project.language ?? "Repository")}</span><span>${view.diffs.length} ${pluralize(view.diffs.length, "window", "windows")}</span></div>
+      <h3><a href="#${escapeHtml(view.project.slug)}">${escapeHtml(view.project.name)}</a></h3>
+      <div class="trail-summaries">${summaries}</div>
+      <a class="text-link" href="${escapeHtml(view.project.slug)}-changes.md">Commit trail <span aria-hidden="true">-&gt;</span></a>
+    </article>`;
+    })
+    .join("\n");
+  return `<section class="commit-trail" id="commit-trail">
+    ${header}
+    <div class="trail-grid">${cards}</div>
+  </section>`;
 }
 
 function projectCard(
@@ -130,13 +200,14 @@ function siteCss(theme: ThemeTokens): string {
 ${themeVariables(theme)}
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; min-width: 320px; background: var(--ink); color: var(--text); line-height: 1.5; font-family: var(--font); }
+body { margin: 0; min-width: 320px; background: var(--ink); color: var(--text); font-family: var(--font); line-height: 1.5; }
 a { color: inherit; }
-.site-shell { min-height: 100vh; background: var(--glow), var(--ink-soft); }
+.site-shell { min-height: 100vh; background: var(--glow), var(--ink); }
 .container { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
 .site-nav { display: flex; justify-content: space-between; align-items: center; padding: 28px 0; border-bottom: 1px solid var(--line); }
+.nav-links { display: flex; gap: 20px; }
 .brand { display: inline-flex; align-items: center; gap: 12px; font: 700 0.9rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-decoration: none; text-transform: uppercase; }
-.brand-mark { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--blue); color: var(--blue); border-radius: var(--radius); font-size: 0.72rem; }
+.brand-mark { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--blue); color: var(--blue); border-radius: 8px; font-size: 0.72rem; }
 .nav-link { color: var(--muted); font: 0.76rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-decoration: none; text-transform: uppercase; }
 .nav-link:hover, .text-link:hover, h2 a:hover { color: var(--blue); }
 .hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr); gap: 80px; align-items: end; padding: 86px 0 70px; }
@@ -164,7 +235,7 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 .screenshot { display: block; width: 100%; height: 100%; min-height: 310px; object-fit: cover; opacity: 0.9; }
 .placeholder { display: flex; min-height: 310px; align-items: center; justify-content: center; flex-direction: column; gap: 7px; color: var(--blue); background: repeating-linear-gradient(135deg, var(--stripe), var(--stripe) 1px, transparent 1px, transparent 14px); }
 .placeholder small { color: var(--muted); font: 0.68rem/1 "SFMono-Regular", Consolas, monospace; text-transform: uppercase; }
-.visual-label { position: absolute; right: 16px; bottom: 16px; padding: 7px 9px; border: 1px solid var(--label-border); border-radius: calc(var(--radius) / 2); background: var(--label-bg); color: var(--blue-soft); }
+.visual-label { position: absolute; right: 16px; bottom: 16px; padding: 7px 9px; border: 1px solid var(--label-border); border-radius: 5px; background: var(--label-bg); color: var(--blue-soft); }
 .project-body { padding: 30px 34px 32px; }
 .card-topline { display: flex; justify-content: space-between; gap: 12px; color: var(--blue); }
 .project-body h2 { margin: 18px 0 8px; font-size: 2.1rem; font-weight: 560; letter-spacing: -0.06em; }
@@ -174,7 +245,7 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 .facts strong { color: var(--text); font-size: 1rem; font-weight: 600; }
 .tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 26px; }
 .tag { padding: 5px 9px; border: 1px solid var(--tag-border); border-radius: 999px; color: var(--mint); background: var(--tag-bg); font: 0.68rem/1 "SFMono-Regular", Consolas, monospace; }
-.change-log { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-strong); }
+.change-log { padding: 18px 0 20px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .section-heading { display: flex; justify-content: space-between; color: var(--orange); }
 .source-badge { color: var(--muted); }
 .change-log h3 { margin: 12px 0 2px; font-size: 1.08rem; font-weight: 550; }
@@ -186,13 +257,22 @@ h1 { max-width: 760px; margin: 0; font-size: clamp(3.2rem, 8vw, 6.4rem); font-we
 .change-preview code { padding: 2px 4px; border-radius: 3px; color: var(--mint); background: var(--code-bg); font: 0.76rem "SFMono-Regular", Consolas, monospace; }
 .text-link { display: inline-block; margin-top: 14px; color: var(--blue); font: 0.73rem/1 "SFMono-Regular", Consolas, monospace; text-decoration: none; text-transform: uppercase; }
 .card-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
-.button { display: inline-block; padding: 10px 14px; border-radius: var(--radius); font: 0.72rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.04em; text-decoration: none; text-transform: uppercase; }
+.button { display: inline-block; padding: 10px 14px; border-radius: 7px; font: 0.72rem/1 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.04em; text-decoration: none; text-transform: uppercase; }
 .button.primary { background: var(--blue); color: var(--button-text); }
 .button.primary:hover { background: var(--blue-soft); }
 .button.secondary { border: 1px solid var(--line); color: var(--text); }
 .button.secondary:hover { border-color: var(--blue); color: var(--blue); }
 .muted { color: var(--muted); }
-.source-trail { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 36px; margin: 80px 0; padding: 26px 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.commit-trail { margin: 80px 0; }
+.trail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+.trail-card { padding: 22px 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-gradient); box-shadow: var(--shadow); }
+.trail-topline { display: flex; justify-content: space-between; gap: 12px; color: var(--blue); font: 0.66rem/1.4 "SFMono-Regular", Consolas, monospace; letter-spacing: 0.1em; text-transform: uppercase; }
+.trail-card h3 { margin: 14px 0 12px; font-size: 1.15rem; font-weight: 560; letter-spacing: -0.03em; }
+.trail-card h3 a { text-decoration: none; }
+.trail-summaries { display: grid; gap: 8px; margin-bottom: 14px; }
+.trail-summary { display: flex; justify-content: space-between; gap: 12px; padding: 9px 11px; border: 1px solid var(--line-soft); border-radius: 7px; background: var(--audit-bg); color: var(--muted); font: 0.7rem/1.4 "SFMono-Regular", Consolas, monospace; }
+.trail-version { color: var(--mint); }
+.source-trail { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 36px; margin: 80px 0; padding: 26px 0; border-top: 1px solid var(--line); }
 .source-trail h2 { margin: 0 0 8px; font-size: 1.2rem; font-weight: 550; }
 .source-trail p { margin: 0; color: var(--muted); font-size: 0.86rem; }
 .audit-list { margin: 0; padding: 0; list-style: none; }
@@ -230,14 +310,22 @@ export interface SiteManifestProject {
   name: string;
   url: string;
   changelogFile: string | null;
+  changesFile: string | null;
 }
 
 export interface SiteManifest {
-  formatVersion: 1;
+  formatVersion: 3;
   generatedAt: string;
   title: string;
   owner: string;
-  theme: string;
+  theme: {
+    name: string;
+    mode: string;
+    accent: string;
+    radius: string;
+    font: string;
+  };
+  feed: string;
   projectCount: number;
   projects: SiteManifestProject[];
   files: string[];
@@ -247,9 +335,12 @@ export interface SiteManifest {
 export interface PublishResult {
   indexPath: string;
   manifestPath: string;
+  galleryPath: string;
+  feedPath: string;
   projectCount: number;
   generatedAt: string;
   theme: string;
+  copiedScreenshots: number;
 }
 
 function relativePosixPaths(outputDir: string): string[] {
@@ -268,33 +359,36 @@ function relativePosixPaths(outputDir: string): string[] {
   return paths.sort();
 }
 
-function copyScreenshotAssets(config: PortfolioConfig, db: PortfolioDatabase): number {
-  const assetsDir = join(config.outputDir, "assets", "screenshots");
-  mkdirSync(assetsDir, { recursive: true });
-
-  let available = 0;
-  for (const project of db.listProjects(true)) {
-    if (!project.screenshot_path || !existsSync(project.screenshot_path)) continue;
-    cpSync(project.screenshot_path, join(assetsDir, `${project.slug}.png`));
-    available++;
-  }
-  return available;
-}
-
 export function publishSite(config: PortfolioConfig): PublishResult {
   const db = openDatabase(config.dataDir, config.clock);
   try {
     const projects = db.listProjects(true);
     const generatedAt = config.clock();
     const theme = resolveTheme(config.theme);
-    const views = projects.map((project) => ({
-      project,
-      changelog: db.getChangelog(project.id),
-      evidence: {
-        commits: db.countCommits(project.id),
-        releases: db.countReleases(project.id),
-      },
-    }));
+    const views = projects.map((project) => {
+      const changelog = db.getChangelog(project.id);
+      const commits = db.getCommitsAscending(project.id);
+      return {
+        project,
+        changelog,
+        evidence: {
+          commits: db.countCommits(project.id),
+          releases: db.countReleases(project.id),
+        },
+        diffs: summarizeCommitDiffs(
+          commits.map((commit) => ({
+            sha: commit.sha,
+            message: commit.message,
+            committed_at: commit.committed_at,
+          })),
+          changelog.map((entry) => ({
+            version: entry.version,
+            title: entry.title,
+            published_at: entry.published_at,
+          }))
+        ),
+      };
+    });
     const totalStars = projects.reduce((sum, project) => sum + project.stars, 0);
     const totalCommits = views.reduce((sum, view) => sum + view.evidence.commits, 0);
     const releaseNotes = views.reduce((sum, view) => sum + view.evidence.releases, 0);
@@ -316,6 +410,7 @@ export function publishSite(config: PortfolioConfig): PublishResult {
   <meta name="description" content="${escapeHtml(config.tagline)}" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'" />
   <title>${escapeHtml(config.title)} / Portfolio</title>
+  <link rel="alternate" type="application/rss+xml" title="${escapeHtml(config.title)} Feed" href="feed.xml" />
   <style>${siteCss(theme)}</style>
 </head>
 <body>
@@ -323,7 +418,11 @@ export function publishSite(config: PortfolioConfig): PublishResult {
     <div class="container">
       <nav class="site-nav" aria-label="Primary navigation">
         <a class="brand" href="#top"><span class="brand-mark">EP</span><span>${escapeHtml(config.title)}</span></a>
-        <a class="nav-link" href="#source-trail">Source trail -&gt;</a>
+        <div class="nav-links">
+          <a class="nav-link" href="#commit-trail">Commit trail -&gt;</a>
+          <a class="nav-link" href="#source-trail">Source trail -&gt;</a>
+          <a class="nav-link" href="feed.xml">Feed -&gt;</a>
+        </div>
       </nav>
       <header class="hero" id="top">
         <div>
@@ -351,8 +450,9 @@ export function publishSite(config: PortfolioConfig): PublishResult {
         ${visibleProjects}
         ${cards}
       </main>
+      ${commitTrailSection(views)}
       <section class="source-trail" id="source-trail">
-        <div><p class="eyebrow">Audit / 03</p><h2>Refresh trail</h2><p>EngineerProfile records each ingest, capture, publish, and deploy operation locally.</p></div>
+        <div><p class="eyebrow">Audit / 04</p><h2>Refresh trail</h2><p>EngineerProfile records each ingest, capture, and publish operation locally.</p></div>
         <ol class="audit-list">${auditItems}</ol>
       </section>
       <footer class="site-footer"><p>${escapeHtml(config.title)} / local publisher</p><p>Public output contains visible projects only. No invented metrics.</p></footer>
@@ -381,21 +481,80 @@ export function publishSite(config: PortfolioConfig): PublishResult {
       writeFileSync(join(config.outputDir, `${view.project.slug}-changelog.md`), markdown, "utf-8");
     }
 
-    copyScreenshotAssets(config, db);
+    for (const view of views) {
+      if (view.diffs.length === 0) continue;
+      const markdown = formatCommitDiffMarkdown(view.project.name, view.diffs);
+      writeFileSync(join(config.outputDir, `${view.project.slug}-changes.md`), markdown, "utf-8");
+    }
+
+    const copiedScreenshots = copyScreenshotsToOutput(config);
+
+    const galleryPath = join(config.outputDir, "theme-gallery.html");
+    const galleryEntries = [
+      ...builtinGalleryThemes(),
+      { label: "configured", theme: config.theme },
+    ];
+    writeFileSync(galleryPath, renderThemeGallery(galleryEntries), "utf-8");
+
+    const baseUrl = (config.feed.baseUrl ?? `https://github.com/${config.owner}`).replace(/\/+$/, "");
+    const feedPath = join(config.outputDir, "feed.xml");
+    writeFileSync(
+      feedPath,
+      renderRssFeed(
+        {
+          title: config.title,
+          link: baseUrl,
+          description: config.tagline,
+          language: "en",
+          lastBuildDate: toRfc2822(generatedAt),
+          generator: "engineer-profile/0.7.0",
+        },
+        views.map((view) => {
+          const latest = view.changelog[0];
+          const link = safeExternalUrl(view.project.url) ?? baseUrl;
+          const descriptionParts: string[] = [];
+          if (view.project.description) descriptionParts.push(view.project.description);
+          if (latest) {
+            descriptionParts.push(`${latest.title} (${latest.version})`);
+            descriptionParts.push(plainText(latest.body).slice(0, 400));
+          }
+          return {
+            title: view.project.name,
+            link,
+            guid: `${link}#${view.project.slug}`,
+            description:
+              descriptionParts.join(" / ").slice(0, 500) || "No description provided.",
+            pubDate: view.project.last_pushed
+              ? toRfc2822(view.project.last_pushed)
+              : toRfc2822(generatedAt),
+            categories: parseTopics(view.project.topics).slice(0, 5),
+          };
+        })
+      ),
+      "utf-8"
+    );
 
     const publishedFiles = relativePosixPaths(config.outputDir);
     const manifest: SiteManifest = {
-      formatVersion: 1,
+      formatVersion: 3,
       generatedAt,
       title: config.title,
       owner: config.owner,
-      theme: theme.name,
+      theme: {
+        name: theme.name,
+        mode: theme.mode,
+        accent: theme.blue,
+        radius: theme.radius,
+        font: theme.font,
+      },
+      feed: "feed.xml",
       projectCount: projects.length,
       projects: views.map((view) => ({
         slug: view.project.slug,
         name: view.project.name,
         url: view.project.url,
         changelogFile: view.changelog.length > 0 ? `${view.project.slug}-changelog.md` : null,
+        changesFile: view.diffs.length > 0 ? `${view.project.slug}-changes.md` : null,
       })),
       files: [...new Set([...publishedFiles, "site-manifest.json"])].sort(),
       screenshots: publishedFiles.filter((file) => file.startsWith("assets/screenshots/")),
@@ -407,9 +566,12 @@ export function publishSite(config: PortfolioConfig): PublishResult {
     return {
       indexPath,
       manifestPath,
+      galleryPath,
+      feedPath,
       projectCount: projects.length,
       generatedAt,
       theme: theme.name,
+      copiedScreenshots,
     };
   } finally {
     db.close();
@@ -417,10 +579,19 @@ export function publishSite(config: PortfolioConfig): PublishResult {
 }
 
 export function copyScreenshotsToOutput(config: PortfolioConfig): number {
+  const assetsDir = join(config.outputDir, "assets", "screenshots");
+  mkdirSync(assetsDir, { recursive: true });
+
   const db = openDatabase(config.dataDir, config.clock);
+  let copied = 0;
   try {
-    return copyScreenshotAssets(config, db);
+    for (const project of db.listProjects(true)) {
+      if (!project.screenshot_path || !existsSync(project.screenshot_path)) continue;
+      cpSync(project.screenshot_path, join(assetsDir, `${project.slug}.png`));
+      copied++;
+    }
   } finally {
     db.close();
   }
+  return copied;
 }

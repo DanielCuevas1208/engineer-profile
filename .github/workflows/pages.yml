@@ -1,0 +1,73 @@
+name: Publish portfolio to GitHub Pages
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 5 * * 1"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: engineer-profile-pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Refresh portfolio
+        run: npm run refresh -- --config engineer-profile.config.json
+
+      - name: Verify published snapshot
+        run: |
+          node scripts/verify-manifest.mjs
+          node scripts/verify-deploy.mjs
+          node dist/index.js deploy --dry-run --json > deploy-pages-preview.json
+          DEPLOY_REPORT=deploy-pages-preview.json node scripts/verify-deploy-report.mjs
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: output
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify deployed URL
+        env:
+          SITE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: node scripts/verify-pages.mjs
+
+      - name: Store deployment preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineer-profile-pages-preview
+          path: deploy-pages-preview.json
+          if-no-files-found: error

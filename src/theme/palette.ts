@@ -38,14 +38,8 @@ interface BuiltinPalette extends Omit<ThemeTokens, "name"> {
   mode: ThemeMode;
 }
 
-export interface ThemeCatalogEntry {
-  name: string;
-  description: string;
-}
-
-const SANS_FONT =
+const SHARED_FONT =
   'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-const MONO_FONT = 'ui-monospace, "Cascadia Mono", Consolas, "SFMono-Regular", Menlo, monospace';
 
 const BUILTIN_PALETTES: Record<string, BuiltinPalette> = {
   "deep-space": {
@@ -76,7 +70,7 @@ const BUILTIN_PALETTES: Record<string, BuiltinPalette> = {
     tagBorder: "rgba(167, 243, 208, 0.26)",
     stripe: "rgba(103, 183, 255, 0.05)",
     radius: "16px",
-    font: SANS_FONT,
+    font: SHARED_FONT,
   },
   paper: {
     mode: "light",
@@ -106,45 +100,50 @@ const BUILTIN_PALETTES: Record<string, BuiltinPalette> = {
     tagBorder: "rgba(15, 118, 110, 0.24)",
     stripe: "rgba(15, 107, 189, 0.08)",
     radius: "16px",
-    font: SANS_FONT,
+    font: SHARED_FONT,
   },
   terminal: {
     mode: "dark",
-    ink: "#070b09",
-    inkSoft: "#0b120d",
-    panel: "#0f1610",
-    panelStrong: "#141e16",
-    line: "rgba(154, 230, 170, 0.16)",
-    lineSoft: "rgba(154, 230, 170, 0.08)",
-    text: "#d8ffe0",
-    muted: "#8aa395",
-    blue: "#3fd95e",
-    blueSoft: "#9cf0ae",
-    buttonText: "#04100a",
-    mint: "#a7f3b0",
-    orange: "#ffb86b",
-    shadow: "0 24px 60px rgba(0, 0, 0, 0.34)",
-    visual: "#050a07",
-    glow: "radial-gradient(circle at 82% -10%, rgba(63, 217, 94, 0.16), transparent 34rem)",
-    panelGradient: "linear-gradient(135deg, rgba(20, 30, 22, 0.98), rgba(11, 18, 13, 0.96))",
-    asideGradient: "linear-gradient(145deg, rgba(20, 30, 22, 0.92), rgba(11, 18, 13, 0.76))",
-    labelBg: "rgba(7, 11, 9, 0.78)",
-    labelBorder: "rgba(216, 255, 224, 0.2)",
-    auditBg: "rgba(15, 22, 16, 0.7)",
-    codeBg: "rgba(63, 217, 94, 0.1)",
-    tagBg: "rgba(63, 217, 94, 0.08)",
-    tagBorder: "rgba(154, 230, 170, 0.3)",
-    stripe: "rgba(63, 217, 94, 0.06)",
-    radius: "4px",
-    font: MONO_FONT,
+    ink: "#0a0f0b",
+    inkSoft: "#0e1611",
+    panel: "#111b13",
+    panelStrong: "#182519",
+    line: "rgba(126, 217, 160, 0.16)",
+    lineSoft: "rgba(126, 217, 160, 0.08)",
+    text: "#d7ffe7",
+    muted: "#7f9f8b",
+    blue: "#7ee9a0",
+    blueSoft: "#b8ffcf",
+    buttonText: "#0a0f0b",
+    mint: "#a7f3d0",
+    orange: "#ffd166",
+    shadow: "0 24px 60px rgba(0, 0, 0, 0.3)",
+    visual: "#0b120c",
+    glow: "radial-gradient(circle at 82% -10%, rgba(126, 233, 160, 0.14), transparent 34rem)",
+    panelGradient: "linear-gradient(135deg, rgba(24, 37, 25, 0.98), rgba(14, 22, 17, 0.96))",
+    asideGradient: "linear-gradient(145deg, rgba(24, 37, 25, 0.92), rgba(14, 22, 17, 0.72))",
+    labelBg: "rgba(10, 15, 11, 0.78)",
+    labelBorder: "rgba(215, 255, 231, 0.18)",
+    auditBg: "rgba(17, 27, 19, 0.72)",
+    codeBg: "rgba(167, 243, 208, 0.09)",
+    tagBg: "rgba(167, 243, 208, 0.07)",
+    tagBorder: "rgba(167, 243, 208, 0.26)",
+    stripe: "rgba(126, 233, 160, 0.05)",
+    radius: "8px",
+    font: 'ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace',
   },
 };
 
 const BUILTIN_DESCRIPTIONS: Record<string, string> = {
   "deep-space": "Dark palette with blue accents. Default.",
-  paper: "Light palette with dark text and high contrast.",
-  terminal: "Dark palette with green phosphor text.",
+  paper: "Light palette with dark text and strong contrast.",
+  terminal: "Dark green-on-black palette with monospace type.",
 };
+
+export interface ThemeCatalogEntry {
+  name: string;
+  description: string;
+}
 
 export function listBuiltinThemes(): ThemeCatalogEntry[] {
   return Object.keys(BUILTIN_PALETTES).map((name) => ({
@@ -175,9 +174,10 @@ function normalizeHexColor(value: string): string {
 }
 
 function hexToRgb(hex: string): [number, number, number] | null {
-  const match = /^[0-9a-f]{6}$/i.exec(hex.replace(/^#/, ""));
+  const normalized = hex.replace(/^#/, "");
+  const match = /^[0-9a-f]{6}$/i.exec(normalized);
   if (!match) return null;
-  const value = Number.parseInt(match[0], 16);
+  const value = Number.parseInt(normalized, 16);
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
@@ -220,11 +220,10 @@ export function resolveTheme(config?: ThemeConfig): ThemeTokens {
   };
 
   if (config?.accent) {
-    const accent = normalizeHexColor(config.accent);
-    tokens.blue = accent;
-    tokens.blueSoft = mixHex(accent, base.mode === "dark" ? "#ffffff" : "#000000", 0.5);
-    tokens.glow = glowFromAccent(accent, base.mode);
-    tokens.stripe = stripeFromAccent(accent, base.mode);
+    tokens.blue = normalizeHexColor(config.accent);
+    tokens.blueSoft = mixHex(tokens.blue, base.mode === "dark" ? "#ffffff" : "#000000", 0.5);
+    tokens.glow = glowFromAccent(tokens.blue, base.mode);
+    tokens.stripe = stripeFromAccent(tokens.blue, base.mode);
   }
   if (config?.radius) tokens.radius = config.radius;
   if (config?.font) tokens.font = config.font;
@@ -232,35 +231,41 @@ export function resolveTheme(config?: ThemeConfig): ThemeTokens {
   return tokens;
 }
 
+export function themePropertyDeclarations(tokens: ThemeTokens): string {
+  return [
+    `color-scheme: ${tokens.mode};`,
+    `--ink: ${tokens.ink};`,
+    `--ink-soft: ${tokens.inkSoft};`,
+    `--panel: ${tokens.panel};`,
+    `--panel-strong: ${tokens.panelStrong};`,
+    `--line: ${tokens.line};`,
+    `--line-soft: ${tokens.lineSoft};`,
+    `--text: ${tokens.text};`,
+    `--muted: ${tokens.muted};`,
+    `--blue: ${tokens.blue};`,
+    `--blue-soft: ${tokens.blueSoft};`,
+    `--button-text: ${tokens.buttonText};`,
+    `--mint: ${tokens.mint};`,
+    `--orange: ${tokens.orange};`,
+    `--shadow: ${tokens.shadow};`,
+    `--visual: ${tokens.visual};`,
+    `--glow: ${tokens.glow};`,
+    `--panel-gradient: ${tokens.panelGradient};`,
+    `--aside-gradient: ${tokens.asideGradient};`,
+    `--label-bg: ${tokens.labelBg};`,
+    `--label-border: ${tokens.labelBorder};`,
+    `--audit-bg: ${tokens.auditBg};`,
+    `--code-bg: ${tokens.codeBg};`,
+    `--tag-bg: ${tokens.tagBg};`,
+    `--tag-border: ${tokens.tagBorder};`,
+    `--stripe: ${tokens.stripe};`,
+    `--radius: ${tokens.radius};`,
+    `--font: ${tokens.font};`,
+  ].join("\n  ");
+}
+
 export function themeVariables(tokens: ThemeTokens): string {
   return `:root {
-  color-scheme: ${tokens.mode};
-  --ink: ${tokens.ink};
-  --ink-soft: ${tokens.inkSoft};
-  --panel: ${tokens.panel};
-  --panel-strong: ${tokens.panelStrong};
-  --line: ${tokens.line};
-  --line-soft: ${tokens.lineSoft};
-  --text: ${tokens.text};
-  --muted: ${tokens.muted};
-  --blue: ${tokens.blue};
-  --blue-soft: ${tokens.blueSoft};
-  --button-text: ${tokens.buttonText};
-  --mint: ${tokens.mint};
-  --orange: ${tokens.orange};
-  --shadow: ${tokens.shadow};
-  --visual: ${tokens.visual};
-  --glow: ${tokens.glow};
-  --panel-gradient: ${tokens.panelGradient};
-  --aside-gradient: ${tokens.asideGradient};
-  --label-bg: ${tokens.labelBg};
-  --label-border: ${tokens.labelBorder};
-  --audit-bg: ${tokens.auditBg};
-  --code-bg: ${tokens.codeBg};
-  --tag-bg: ${tokens.tagBg};
-  --tag-border: ${tokens.tagBorder};
-  --stripe: ${tokens.stripe};
-  --radius: ${tokens.radius};
-  --font: ${tokens.font};
+  ${themePropertyDeclarations(tokens)}
 }`;
 }

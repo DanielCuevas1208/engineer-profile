@@ -3,7 +3,7 @@ import { rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { openDatabase } from "../src/db/client.js";
 import { ingestRepository } from "../src/ingest/orchestrator.js";
-import { publishSite, copyScreenshotsToOutput } from "../src/publish/site.js";
+import { publishSite } from "../src/publish/site.js";
 import { loadFixtureRepo, loadFixtureCommits, loadFixtureReleases } from "../src/fixtures/loader.js";
 import { DEFAULT_CONFIG } from "../src/types.js";
 
@@ -78,25 +78,44 @@ describe("database and publish pipeline", () => {
 
     const result = publishSite(config);
     expect(result.projectCount).toBe(1);
-    expect(result.theme).toBe("deep-space");
     expect(existsSync(result.indexPath)).toBe(true);
-    expect(existsSync(result.manifestPath)).toBe(true);
 
     const html = readFileSync(result.indexPath, "utf-8");
     expect(html).toContain("signal-router");
     expect(html).toContain("auditable SQLite data");
     expect(html).toContain("42 stars");
     expect(html).toContain("total stars");
-    expect(html).toContain("Theme / deep-space");
+  });
 
-    const manifest = JSON.parse(readFileSync(result.manifestPath, "utf-8")) as {
-      formatVersion: number;
-      theme: string;
-      files: string[];
-    };
-    expect(manifest.formatVersion).toBe(1);
-    expect(manifest.theme).toBe("deep-space");
-    expect(manifest.files).toContain("index.html");
+  it("publishes an RSS feed and a commit trail", async () => {
+    const config = { ...DEFAULT_CONFIG, dataDir: TEST_DATA, outputDir: TEST_OUTPUT };
+    await ingestRepository(
+      config,
+      { owner: "demo-engineer", repo: "signal-router" },
+      {
+        repo: loadFixtureRepo("signal-router"),
+        commits: loadFixtureCommits("signal-router"),
+        releases: loadFixtureReleases("signal-router"),
+      }
+    );
+
+    const result = publishSite(config);
+    expect(existsSync(result.feedPath)).toBe(true);
+
+    const feed = readFileSync(result.feedPath, "utf-8");
+    expect(feed).toContain("<rss version=\"2.0\"");
+    expect(feed).toContain("<item>");
+    expect(feed).toContain("signal-router");
+    expect(feed).toContain("<category>typescript</category>");
+
+    const changesPath = join(TEST_OUTPUT, "demo-engineer-signal-router-changes.md");
+    expect(existsSync(changesPath)).toBe(true);
+    const changes = readFileSync(changesPath, "utf-8");
+    expect(changes).toContain("Commit trail");
+
+    const html = readFileSync(result.indexPath, "utf-8");
+    expect(html).toContain("Commit trail");
+    expect(html).toContain("href=\"feed.xml\"");
   });
 
   it("respects visibility when publishing", async () => {

@@ -23,7 +23,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Install dependencies
@@ -47,21 +47,36 @@ jobs:
       - name: Verify theme catalog
         run: node dist/index.js themes
 
-      - name: Verify site manifest
+      - name: Verify site manifest, commit trail, and RSS feed
+        env:
+          EXPECTED_PROJECT_COUNT: "2"
+        run: node scripts/verify-manifest.mjs
+
+      - name: Preview local deploy
+        run: node dist/index.js deploy --dry-run
+
+      - name: Verify JSON deployment report
         run: |
-          node -e "
-          const m = require('./output/site-manifest.json');
-          if (m.formatVersion !== 1) process.exit(1);
-          if (m.projectCount !== 2) process.exit(1);
-          if (!m.files.includes('index.html')) process.exit(1);
-          if (!m.files.includes('site-manifest.json')) process.exit(1);
-          console.log('Manifest ok: ' + m.projectCount + ' projects, theme ' + m.theme);
-          "
+          node dist/index.js deploy --dry-run --json > deploy-preview.json
+          node scripts/verify-deploy-report.mjs
+
+      - name: Sync local deploy and verify report
+        run: |
+          node dist/index.js deploy --json > deploy-sync.json
+          DEPLOY_REPORT=deploy-sync.json node scripts/verify-deploy-report.mjs
+
+      - name: Check deployed snapshot
+        env:
+          EXPECTED_PROJECT_COUNT: "2"
+        run: node scripts/verify-deploy.mjs
 
       - name: Store demo output
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: engineer-profile-demo
-          path: output/
+          path: |
+            output/
+            deploy-preview.json
+            deploy-sync.json
           if-no-files-found: error

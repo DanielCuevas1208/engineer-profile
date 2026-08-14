@@ -1,32 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { deployAll, deployToTarget } from "../src/deploy/index.js";
-import { isPathInside } from "../src/deploy/local.js";
+import {
+  deployAll,
+  deployToTarget,
+  isSupportedAdapter,
+  listSupportedAdapters,
+  previewAll,
+  previewToTarget,
+} from "../src/deploy/index.js";
 import { openDatabase } from "../src/db/client.js";
+import { digestSnapshot } from "../src/deploy/snapshot.js";
 import { DEFAULT_CONFIG } from "../src/types.js";
 
 const TEST_DATA = join("data", "test-deploy");
 const TEST_OUTPUT = join("output", "test-deploy");
 const TEST_TARGET = join("deploy", "test-deploy-target");
-
-function publishedConfig(target = TEST_TARGET) {
-  return {
-    ...DEFAULT_CONFIG,
-    dataDir: TEST_DATA,
-    outputDir: TEST_OUTPUT,
-    deploy: {
-      targets: [{ name: "public", type: "local" as const, target }],
-    },
-    clock: () => "2026-07-31T00:00:00.000Z",
-  };
-}
-
-function writePublishedSite() {
-  mkdirSync(join(TEST_OUTPUT, "assets", "screenshots"), { recursive: true });
-  writeFileSync(join(TEST_OUTPUT, "index.html"), "<html>portfolio</html>", "utf-8");
-  writeFileSync(join(TEST_OUTPUT, "site-manifest.json"), "{}", "utf-8");
-}
 
 describe("deploy adapters", () => {
   beforeEach(() => {
@@ -41,16 +30,129 @@ describe("deploy adapters", () => {
     rmSync(TEST_TARGET, { recursive: true, force: true });
   });
 
+  function publishedConfig() {
+    const config = {
+      ...DEFAULT_CONFIG,
+      dataDir: TEST_DATA,
+      outputDir: TEST_OUTPUT,
+      deploy: {
+        targets: [{ name: "public", type: "local" as const, target: TEST_TARGET }],
+      },
+      clock: () => "2026-07-31T00:00:00.000Z",
+    };
+    return config;
+  }
+
+  function writePublishedSite() {
+    mkdirSync(join(TEST_OUTPUT, "assets", "screenshots"), { recursive: true });
+    writeFileSync(join(TEST_OUTPUT, "index.html"), "<html>portfolio</html>", "utf-8");
+    writeFileSync(join(TEST_OUTPUT, "site-manifest.json"), "{}", "utf-8");
+  }
+
   it("copies the published site into a local target", () => {
     writePublishedSite();
-    const result = deployAll(publishedConfig());
+    const config = publishedConfig();
+    const result = deployAll(config);
 
     expect(result).toHaveLength(1);
     expect(result[0].targetName).toBe("public");
     expect(result[0].targetPath).toBe(TEST_TARGET);
     expect(result[0].files).toBeGreaterThanOrEqual(2);
+    expect(result[0].removed).toBe(0);
+    expect(result[0].verified).toBe(true);
+    expect(result[0].sourceDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(result[0].targetDigest).toBe(result[0].sourceDigest);
     expect(existsSync(join(TEST_TARGET, "index.html"))).toBe(true);
     expect(existsSync(join(TEST_TARGET, "site-manifest.json"))).toBe(true);
+  });
+
+  it("removes stale files that are not part of the snapshot", () => {
+    writePublishedSite();
+    mkdirSync(join(TEST_TARGET, "assets"), { recursive: true });
+    writeFileSync(join(TEST_TARGET, "old-capture.png"), "stale", "utf-8");
+    const config = publishedConfig();
+
+    const result = deployAll(config);
+
+    expect(result[0].removed).toBe(1);
+    expect(existsSync(join(TEST_TARGET, "old-capture.png"))).toBe(false);
+    expect(existsSync(join(TEST_TARGET, "index.html"))).toBe(true);
+  });
+
+  it("reports an unverified result when the manifest is missing", () => {
+    mkdirSync(TEST_OUTPUT, { recursive: true });
+    writeFileSync(join(TEST_OUTPUT, "index.html"), "<html>partial</html>", "utf-8");
+    const config = publishedConfig();
+
+    const result = deployAll(config);
+
+    expect(result[0].verified).toBe(false);
+    expect(result[0].files).toBe(1);
+  });
+
+  it("previews added, changed, removed, and unchanged files without writing the target", () => {
+    writePublishedSite();
+    writeFileSync(join(TEST_OUTPUT, "new.txt"), "new", "utf-8");
+    mkdirSync(TEST_TARGET, { recursive: true });
+    writeFileSync(join(TEST_TARGET, "index.html"), "old", "utf-8");
+    writeFileSync(join(TEST_TARGET, "site-manifest.json"), "{}", "utf-8");
+    writeFileSync(join(TEST_TARGET, "stale.txt"), "stale", "utf-8");
+    const config = publishedConfig();
+
+    const result = previewAll(config);
+
+    expect(result[0]).toMatchObject({
+      targetName: "public",
+      status: "changed",
+      added: ["new.txt"],
+      changed: ["index.html"],
+      removed: ["stale.txt"],
+      unchanged: 1,
+      files: 3,
+    });
+    expect(readFileSync(join(TEST_TARGET, "index.html"), "utf-8")).toBe("old");
+    expect(existsSync(join(TEST_TARGET, "stale.txt"))).toBe(true);
+  });
+
+  it("previews a missing target without creating its directory", () => {
+    writePublishedSite();
+    const config = publishedConfig();
+
+    const result = previewToTarget(config, config.deploy.targets[0]);
+
+    expect(result.status).toBe("changed");
+    expect(result.added).toEqual(["index.html", "site-manifest.json"]);
+    expect(result.changed).toEqual([]);
+    expect(result.removed).toEqual([]);
+    expect(result.sourceDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.targetDigest).toBeNull();
+    expect(existsSync(TEST_TARGET)).toBe(false);
+  });
+
+  it("produces a stable digest for the same snapshot and changes it when content changes", () => {
+    writePublishedSite();
+    const first = digestSnapshot(TEST_OUTPUT);
+    const second = digestSnapshot(TEST_OUTPUT);
+
+    expect(first).toBe(second);
+    expect(first).toMatch(/^[a-f0-9]{64}$/);
+
+    writeFileSync(join(TEST_OUTPUT, "index.html"), "<html>changed</html>", "utf-8");
+    expect(digestSnapshot(TEST_OUTPUT)).not.toBe(first);
+  });
+
+  it("reports a clean preview when both snapshots match", () => {
+    writePublishedSite();
+    const config = publishedConfig();
+    deployAll(config);
+
+    const result = previewToTarget(config, config.deploy.targets[0]);
+
+    expect(result.status).toBe("clean");
+    expect(result.added).toEqual([]);
+    expect(result.changed).toEqual([]);
+    expect(result.removed).toEqual([]);
+    expect(result.unchanged).toBe(result.files);
   });
 
   it("reports a publish-first error when output is missing", () => {
@@ -62,21 +164,28 @@ describe("deploy adapters", () => {
 
   it("rejects a target inside the output directory", () => {
     writePublishedSite();
-    const config = publishedConfig(join(TEST_OUTPUT, "nested"));
+    const config = {
+      ...publishedConfig(),
+      deploy: {
+        targets: [
+          { name: "nested", type: "local" as const, target: join(TEST_OUTPUT, "nested") },
+        ],
+      },
+    };
     expect(() => deployAll(config)).toThrow(/must be outside the output directory/);
   });
 
   it("returns an empty result list without targets", () => {
-    writePublishedSite();
     const config = { ...publishedConfig(), deploy: { targets: [] } };
     expect(deployAll(config)).toEqual([]);
   });
 
   it("records a deploy audit entry", () => {
     writePublishedSite();
-    deployAll(publishedConfig());
+    const config = publishedConfig();
+    deployAll(config);
 
-    const db = openDatabase(TEST_DATA, publishedConfig().clock);
+    const db = openDatabase(TEST_DATA, config.clock);
     const log = db.getIngestLog(5);
     db.close();
     expect(log[0].action).toBe("deploy");
@@ -90,16 +199,56 @@ describe("deploy adapters", () => {
       "png",
       "utf-8"
     );
-    deployAll(publishedConfig());
+    const config = publishedConfig();
+    deployAll(config);
 
     const targetFiles = readdirSync(join(TEST_TARGET, "assets", "screenshots"));
     expect(targetFiles).toContain("demo-engineer-signal-router.png");
   });
 
-  it("reports paths that fall inside a parent directory", () => {
-    expect(isPathInside("output", "output/nested")).toBe(true);
-    expect(isPathInside("output", "output")).toBe(true);
-    expect(isPathInside("output", "other")).toBe(false);
-    expect(isPathInside("output", "output-extra")).toBe(false);
+  it("lists all supported remote and local deploy adapters", () => {
+    const adapters = listSupportedAdapters();
+    expect(adapters).toEqual(["local", "s3", "netlify", "vercel", "rsync"]);
+    expect(isSupportedAdapter("local")).toBe(true);
+    expect(isSupportedAdapter("s3")).toBe(true);
+    expect(isSupportedAdapter("netlify")).toBe(true);
+    expect(isSupportedAdapter("vercel")).toBe(true);
+    expect(isSupportedAdapter("rsync")).toBe(true);
+    expect(isSupportedAdapter("unknown")).toBe(false);
+  });
+
+  it("dispatches deploy and preview to mixed target types", () => {
+    writePublishedSite();
+    const config = {
+      ...publishedConfig(),
+      deploy: {
+        targets: [
+          { name: "local-target", type: "local" as const, target: TEST_TARGET },
+          { name: "s3-target", type: "s3" as const, bucket: "test-bucket", target: join("deploy", "test-s3") },
+          { name: "netlify-target", type: "netlify" as const, siteId: "net-123", target: join("deploy", "test-net") },
+          { name: "vercel-target", type: "vercel" as const, projectId: "ver-123", target: join("deploy", "test-ver") },
+          { name: "rsync-target", type: "rsync" as const, host: "h.io", path: "/w", target: join("deploy", "test-rsync") },
+        ],
+      },
+    };
+
+    const previews = previewAll(config);
+    expect(previews).toHaveLength(5);
+    expect(previews[0].targetName).toBe("local-target");
+    expect(previews[1].targetName).toBe("s3-target");
+    expect(previews[2].targetName).toBe("netlify-target");
+    expect(previews[3].targetName).toBe("vercel-target");
+    expect(previews[4].targetName).toBe("rsync-target");
+
+    const results = deployAll(config);
+    expect(results).toHaveLength(5);
+    for (const res of results) {
+      expect(res.verified).toBe(true);
+    }
+
+    rmSync(join("deploy", "test-s3"), { recursive: true, force: true });
+    rmSync(join("deploy", "test-net"), { recursive: true, force: true });
+    rmSync(join("deploy", "test-ver"), { recursive: true, force: true });
+    rmSync(join("deploy", "test-rsync"), { recursive: true, force: true });
   });
 });

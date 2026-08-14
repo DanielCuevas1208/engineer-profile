@@ -3,7 +3,7 @@ import { rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ingestOwnerRepos } from "../src/ingest/orchestrator.js";
 import { captureLocalHtml, closeBrowser } from "../src/preview/capture.js";
-import { publishSite, copyScreenshotsToOutput } from "../src/publish/site.js";
+import { publishSite } from "../src/publish/site.js";
 import { loadAllFixtures } from "../src/fixtures/loader.js";
 import { DEFAULT_CONFIG } from "../src/types.js";
 
@@ -36,10 +36,9 @@ describe("demo pipeline", () => {
     }
 
     const published = publishSite(config);
-    const copied = copyScreenshotsToOutput(config);
 
     expect(published.projectCount).toBe(2);
-    expect(copied).toBe(2);
+    expect(published.copiedScreenshots).toBe(2);
     expect(existsSync(published.indexPath)).toBe(true);
 
     const html = readFileSync(published.indexPath, "utf-8");

@@ -1,14 +1,10 @@
 import { readFileSync } from "node:fs";
-import type {
-  DeployConfig,
-  DeployTarget,
-  PortfolioConfig,
-  PrivacyConfig,
-  ThemeConfig,
-} from "../types.js";
-import { DEFAULT_CONFIG, DEFAULT_DEPLOY, DEFAULT_PRIVACY, DEFAULT_THEME } from "../types.js";
+import type { DeployConfig, DeployTarget, FeedConfig, PortfolioConfig, PrivacyConfig, ThemeConfig } from "../types.js";
+import { DEFAULT_CONFIG, DEFAULT_DEPLOY, DEFAULT_FEED, DEFAULT_PRIVACY, DEFAULT_THEME } from "../types.js";
 import { mergePrivacy } from "../privacy/controls.js";
 import { isBuiltinTheme, isValidHexColor, listBuiltinThemes } from "../theme/palette.js";
+import { isSupportedAdapter, listSupportedAdapters } from "../deploy/index.js";
+import { validateS3BucketName } from "../deploy/s3.js";
 
 export const DEFAULT_CONFIG_PATH = "engineer-profile.config.json";
 
@@ -118,26 +114,129 @@ function readDeploy(source: ConfigValue): DeployConfig {
     if (!isConfigValue(target)) {
       throw new Error(`Configuration field "deploy.targets[${index}]" must be an object.`);
     }
-    const { name, type, target: targetPath } = target;
+    const { name, type } = target;
     if (typeof name !== "string" || name.trim() === "") {
-      throw new Error(
-        `Configuration field "deploy.targets[${index}].name" must be a non-empty string.`
-      );
+      throw new Error(`Configuration field "deploy.targets[${index}].name" must be a non-empty string.`);
     }
-    if (type !== "local") {
-      throw new Error(
-        `Configuration field "deploy.targets[${index}].type" must be "local".`
-      );
+    if (typeof type !== "string" || !isSupportedAdapter(type)) {
+      const supported = listSupportedAdapters().join(", ");
+      throw new Error(`Configuration field "deploy.targets[${index}].type" must be one of: ${supported}.`);
     }
-    if (typeof targetPath !== "string" || targetPath.trim() === "") {
-      throw new Error(
-        `Configuration field "deploy.targets[${index}].target" must be a non-empty path.`
-      );
+
+    if (type === "local") {
+      const targetPath = target.target;
+      if (typeof targetPath !== "string" || targetPath.trim() === "") {
+        throw new Error(`Configuration field "deploy.targets[${index}].target" must be a non-empty path.`);
+      }
+      return { name: name.trim(), type: "local", target: targetPath.trim() };
     }
-    return { name: name.trim(), type: "local", target: targetPath.trim() };
+
+    if (type === "s3") {
+      const bucket = target.bucket;
+      if (typeof bucket !== "string" || !validateS3BucketName(bucket)) {
+        throw new Error(`Configuration field "deploy.targets[${index}].bucket" must be a valid S3 bucket name.`);
+      }
+      const s3Target: DeployTarget = { name: name.trim(), type: "s3", bucket: bucket.trim() };
+      if ("region" in target && typeof target.region === "string" && target.region.trim()) {
+        s3Target.region = target.region.trim();
+      }
+      if ("prefix" in target && typeof target.prefix === "string" && target.prefix.trim()) {
+        s3Target.prefix = target.prefix.trim();
+      }
+      if ("endpoint" in target && typeof target.endpoint === "string" && target.endpoint.trim()) {
+        s3Target.endpoint = target.endpoint.trim();
+      }
+      if ("target" in target && typeof target.target === "string" && target.target.trim()) {
+        s3Target.target = target.target.trim();
+      }
+      return s3Target;
+    }
+
+    if (type === "netlify") {
+      const netlifyTarget: DeployTarget = { name: name.trim(), type: "netlify" };
+      if ("siteId" in target && typeof target.siteId === "string" && target.siteId.trim()) {
+        netlifyTarget.siteId = target.siteId.trim();
+      }
+      if ("target" in target && typeof target.target === "string" && target.target.trim()) {
+        netlifyTarget.target = target.target.trim();
+      }
+      if ("publishDir" in target && typeof target.publishDir === "string" && target.publishDir.trim()) {
+        netlifyTarget.publishDir = target.publishDir.trim();
+      }
+      return netlifyTarget;
+    }
+
+    if (type === "vercel") {
+      const vercelTarget: DeployTarget = { name: name.trim(), type: "vercel" };
+      if ("projectId" in target && typeof target.projectId === "string" && target.projectId.trim()) {
+        vercelTarget.projectId = target.projectId.trim();
+      }
+      if ("target" in target && typeof target.target === "string" && target.target.trim()) {
+        vercelTarget.target = target.target.trim();
+      }
+      if ("cleanUrls" in target && typeof target.cleanUrls === "boolean") {
+        vercelTarget.cleanUrls = target.cleanUrls;
+      }
+      if ("trailingSlash" in target && typeof target.trailingSlash === "boolean") {
+        vercelTarget.trailingSlash = target.trailingSlash;
+      }
+      return vercelTarget;
+    }
+
+    if (type === "rsync") {
+      const host = target.host;
+      const path = target.path;
+      if (typeof host !== "string" || host.trim() === "") {
+        throw new Error(`Configuration field "deploy.targets[${index}].host" must be a non-empty string.`);
+      }
+      if (typeof path !== "string" || path.trim() === "") {
+        throw new Error(`Configuration field "deploy.targets[${index}].path" must be a non-empty string.`);
+      }
+      const rsyncTarget: DeployTarget = {
+        name: name.trim(),
+        type: "rsync",
+        host: host.trim(),
+        path: path.trim(),
+      };
+      if ("user" in target && typeof target.user === "string" && target.user.trim()) {
+        rsyncTarget.user = target.user.trim();
+      }
+      if ("port" in target) {
+        const port = target.port;
+        if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535) {
+          throw new Error(`Configuration field "deploy.targets[${index}].port" must be an integer from 1 to 65535.`);
+        }
+        rsyncTarget.port = port;
+      }
+      if ("delete" in target && typeof target.delete === "boolean") {
+        rsyncTarget.delete = target.delete;
+      }
+      if ("target" in target && typeof target.target === "string" && target.target.trim()) {
+        rsyncTarget.target = target.target.trim();
+      }
+      return rsyncTarget;
+    }
+
+    throw new Error(`Unsupported deploy adapter type "${type}".`);
   });
 
   return { targets: parsedTargets };
+}
+
+function readFeed(source: ConfigValue): FeedConfig {
+  if (!("feed" in source)) return DEFAULT_FEED;
+  if (!isConfigValue(source.feed)) {
+    throw new Error('Configuration field "feed" must be an object.');
+  }
+  const feed: FeedConfig = {};
+  if ("baseUrl" in source.feed) {
+    const baseUrl = source.feed.baseUrl;
+    if (typeof baseUrl !== "string" || !/^https?:\/\/.+/i.test(baseUrl.trim())) {
+      throw new Error('Configuration field "feed.baseUrl" must be an absolute http(s) URL.');
+    }
+    feed.baseUrl = baseUrl.trim().replace(/\/+$/, "");
+  }
+  return feed;
 }
 
 export function loadPortfolioConfig(
@@ -164,6 +263,7 @@ export function loadPortfolioConfig(
     outputDir: readString(parsed, "outputDir", DEFAULT_CONFIG.outputDir),
     theme: readTheme(parsed),
     deploy: readDeploy(parsed),
+    feed: readFeed(parsed),
     privacy: readPrivacy(parsed),
     clock,
   };

@@ -24,7 +24,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Install dependencies
@@ -35,6 +35,11 @@ jobs:
 
       - name: Refresh portfolio
         run: npm run refresh -- --config engineer-profile.config.json
+
+      - name: Verify refreshed snapshot
+        run: |
+          node scripts/verify-manifest.mjs
+          node scripts/verify-deploy.mjs
 
       - name: Store refreshed site
         uses: actions/upload-artifact@v4

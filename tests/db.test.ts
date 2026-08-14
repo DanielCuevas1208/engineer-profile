@@ -122,4 +122,34 @@ describe("PortfolioDatabase", () => {
     expect(pub[0].slug).toBe("visible");
     db.close();
   });
+
+  it("lists commits ascending for diff summaries", () => {
+    const db = openDatabase(TEST_DATA);
+    const project = db.upsertProject({
+      slug: "ascending",
+      name: "Ascending",
+      description: null,
+      url: "https://github.com/o/a",
+      homepage: null,
+      language: null,
+      stars: 0,
+      forks: 0,
+      topics: "[]",
+      last_pushed: "2026-01-03T00:00:00Z",
+      visible: 1,
+      screenshot_path: null,
+      ingested_at: "2026-01-01T00:00:00Z",
+    });
+    db.upsertCommits(project.id, [
+      { sha: "c1", message: "feat: first", author_name: "Dev", author_email: null, committed_at: "2026-01-03T00:00:00Z", url: "https://github.com/o/a/commit/c1" },
+      { sha: "c2", message: "fix: second", author_name: "Dev", author_email: null, committed_at: "2026-01-02T00:00:00Z", url: "https://github.com/o/a/commit/c2" },
+      { sha: "c3", message: "docs: third", author_name: "Dev", author_email: null, committed_at: "2026-01-01T00:00:00Z", url: "https://github.com/o/a/commit/c3" },
+    ]);
+
+    const ascending = db.getCommitsAscending(project.id);
+    expect(ascending.map((commit) => commit.sha)).toEqual(["c3", "c2", "c1"]);
+    const limited = db.getCommitsAscending(project.id, 2);
+    expect(limited.map((commit) => commit.sha)).toEqual(["c3", "c2"]);
+    db.close();
+  });
 });

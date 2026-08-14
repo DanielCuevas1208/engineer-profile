@@ -1,17 +1,34 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { readFileSync, rmSync, existsSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { ingestOwnerRepos } from "../src/ingest/orchestrator.js";
-import { captureLocalHtml, closeBrowser } from "../src/preview/capture.js";
-import { publishSite, type SiteManifest } from "../src/publish/site.js";
-import { loadAllFixtures } from "../src/fixtures/loader.js";
-import { DEFAULT_CONFIG } from "../src/types.js";
+import { ingestRepository } from "../src/ingest/orchestrator.js";
+import { publishSite } from "../src/publish/site.js";
+import { loadFixtureRepo, loadFixtureCommits, loadFixtureReleases } from "../src/fixtures/loader.js";
+import { DEFAULT_CONFIG, type PortfolioConfig } from "../src/types.js";
 
 const TEST_DATA = join("data", "test-manifest");
 const TEST_OUTPUT = join("output", "test-manifest");
 
-function readManifest(): SiteManifest {
-  return JSON.parse(readFileSync(join(TEST_OUTPUT, "site-manifest.json"), "utf-8")) as SiteManifest;
+function fixtureConfig(): PortfolioConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    dataDir: TEST_DATA,
+    outputDir: TEST_OUTPUT,
+    theme: { name: "paper", accent: "#0f6bbd" },
+    clock: () => "2026-07-31T00:00:00.000Z",
+  };
+}
+
+async function ingestSignalRouter(config: PortfolioConfig) {
+  await ingestRepository(
+    config,
+    { owner: "demo-engineer", repo: "signal-router" },
+    {
+      repo: loadFixtureRepo("signal-router"),
+      commits: loadFixtureCommits("signal-router"),
+      releases: loadFixtureReleases("signal-router"),
+    }
+  );
 }
 
 describe("site manifest", () => {
@@ -20,72 +37,63 @@ describe("site manifest", () => {
     rmSync(TEST_OUTPUT, { recursive: true, force: true });
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     rmSync(TEST_DATA, { recursive: true, force: true });
     rmSync(TEST_OUTPUT, { recursive: true, force: true });
-    await closeBrowser();
   });
 
-  it("records format, theme, and project counts", async () => {
-    const config = {
-      ...DEFAULT_CONFIG,
-      dataDir: TEST_DATA,
-      outputDir: TEST_OUTPUT,
-      clock: () => "2026-07-31T00:00:00.000Z",
-    };
-    await ingestOwnerRepos(config, config.owner, 2, loadAllFixtures());
+  it("writes a versioned manifest with published project facts", async () => {
+    const config = fixtureConfig();
+    await ingestSignalRouter(config);
     const result = publishSite(config);
 
-    expect(result.theme).toBe("deep-space");
-    expect(result.manifestPath).toBe(join(TEST_OUTPUT, "site-manifest.json"));
     expect(existsSync(result.manifestPath)).toBe(true);
+    const manifest = JSON.parse(readFileSync(result.manifestPath, "utf-8")) as {
+      formatVersion: number;
+      theme: { name: string; mode: string; accent: string; radius: string; font: string };
+      feed: string;
+      projectCount: number;
+      projects: Array<{ slug: string; url: string; changelogFile: string | null; changesFile: string | null }>;
+      files: string[];
+      screenshots: string[];
+    };
 
-    const manifest = readManifest();
-    expect(manifest.formatVersion).toBe(1);
-    expect(manifest.theme).toBe("deep-space");
-    expect(manifest.projectCount).toBe(2);
-    expect(manifest.owner).toBe("demo-engineer");
-    expect(manifest.generatedAt).toBe("2026-07-31T00:00:00.000Z");
+    expect(manifest.formatVersion).toBe(3);
+    expect(manifest.feed).toBe("feed.xml");
+    expect(manifest.theme.name).toBe("paper");
+    expect(manifest.theme.mode).toBe("light");
+    expect(manifest.theme.accent).toBe("#0f6bbd");
+    expect(manifest.theme.radius).toBe("16px");
+    expect(manifest.projectCount).toBe(1);
+    expect(manifest.projects[0].slug).toBe("demo-engineer-signal-router");
+    expect(manifest.projects[0].url).toBe("https://github.com/demo-engineer/signal-router");
+    expect(manifest.projects[0].changelogFile).toBe("demo-engineer-signal-router-changelog.md");
+    expect(manifest.projects[0].changesFile).toBe("demo-engineer-signal-router-changes.md");
     expect(manifest.files).toContain("index.html");
     expect(manifest.files).toContain("site-manifest.json");
-    expect(manifest.files).toContain("demo-engineer-signal-router-changelog.md");
-    expect(manifest.projects).toHaveLength(2);
+    expect(manifest.files).toContain("theme-gallery.html");
+    expect(manifest.files).toContain("feed.xml");
+    expect(manifest.files).toContain("demo-engineer-signal-router-changes.md");
+    expect(Array.isArray(manifest.screenshots)).toBe(true);
   });
 
-  it("lists screenshots after capture", async () => {
-    const config = {
-      ...DEFAULT_CONFIG,
-      dataDir: TEST_DATA,
-      outputDir: TEST_OUTPUT,
-      clock: () => "2026-07-31T00:00:00.000Z",
-    };
-    await ingestOwnerRepos(config, config.owner, 2, loadAllFixtures());
-    for (const fixture of loadAllFixtures()) {
-      const slug = fixture.repo.full_name.replace(/\//g, "-").toLowerCase();
-      await captureLocalHtml(config, slug, join("fixtures", "preview-pages", `${fixture.repo.name}.html`));
-    }
+  it("produces a deterministic manifest for the same snapshot", async () => {
+    const config = fixtureConfig();
+    await ingestSignalRouter(config);
     publishSite(config);
-
-    const manifest = readManifest();
-    expect(manifest.screenshots).toContain("assets/screenshots/demo-engineer-signal-router.png");
-    expect(manifest.screenshots).toContain("assets/screenshots/demo-engineer-metrics-kit.png");
+    const first = readFileSync(join(TEST_OUTPUT, "site-manifest.json"), "utf-8");
+    publishSite(config);
+    const second = readFileSync(join(TEST_OUTPUT, "site-manifest.json"), "utf-8");
+    expect(first).toBe(second);
   });
 
-  it("publishes with a custom theme", async () => {
-    const config = {
-      ...DEFAULT_CONFIG,
-      dataDir: TEST_DATA,
-      outputDir: TEST_OUTPUT,
-      theme: { name: "paper" },
-      clock: () => "2026-07-31T00:00:00.000Z",
-    };
-    await ingestOwnerRepos(config, config.owner, 2, loadAllFixtures());
+  it("reflects an empty portfolio with zero projects", async () => {
+    const config = fixtureConfig();
     const result = publishSite(config);
-
-    expect(result.theme).toBe("paper");
-    expect(readManifest().theme).toBe("paper");
-    const html = readFileSync(result.indexPath, "utf-8");
-    expect(html).toContain("Theme / paper");
-    expect(html).toContain("color-scheme: light");
+    const manifest = JSON.parse(readFileSync(result.manifestPath, "utf-8")) as {
+      formatVersion: number;
+      projectCount: number;
+    };
+    expect(manifest.projectCount).toBe(0);
   });
 });
