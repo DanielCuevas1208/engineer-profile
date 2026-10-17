@@ -28,6 +28,14 @@ Check `.github/workflows/pages.yml` permissions after remote publishing changes.
 Verify `output/feed.xml` after changelog or feed changes.
 Check `output/*-changes.md` after commit-diff changes.
 
+## Feature areas
+
+The theme catalog lives in `src/theme/`.
+Add a palette, then register its description.
+The deploy adapters live in `src/deploy/`.
+Implement validation, preview diffs, and staging deployments for new providers.
+Keep the publish, capture, and deploy stages separated.
+
 ## Pull requests
 
 Explain the user value and the data path.
