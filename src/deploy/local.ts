@@ -1,7 +1,7 @@
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { openDatabase } from "../db/client.js";
-import type { DeployTarget, PortfolioConfig } from "../types.js";
+import type { LocalDeployTarget, PortfolioConfig } from "../types.js";
 import { digestSnapshot, listSnapshotPaths } from "./snapshot.js";
 
 export interface DeployResult {
@@ -21,7 +21,7 @@ function isPathInside(parent: string, child: string): boolean {
 
 export function deployLocal(
   config: PortfolioConfig,
-  target: DeployTarget
+  target: LocalDeployTarget
 ): DeployResult {
   const indexPath = join(config.outputDir, "index.html");
   if (!existsSync(indexPath)) {

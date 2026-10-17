@@ -1,6 +1,6 @@
 {
   "name": "engineer-profile",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Self-maintaining engineering portfolio from repository activity",
   "type": "module",
   "main": "dist/index.js",
@@ -19,6 +19,8 @@
     "publish": "npm run build && node dist/index.js publish",
     "capture": "npm run build && node dist/index.js capture",
     "gallery": "npm run build && node dist/index.js themes --preview",
+    "deploy": "npm run build && node dist/index.js deploy",
+    "themes": "npm run build && node dist/index.js themes",
     "refresh": "npm run build && node dist/index.js refresh"
   },
   "engines": {
@@ -41,16 +43,16 @@
   },
   "homepage": "https://github.com/DanielCuevas1208/engineer-profile#readme",
   "dependencies": {
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^13.0.3",
     "commander": "^15.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.1",
     "@types/better-sqlite3": "^7.6.12",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.5.0",
     "playwright": "^1.50.1",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
-    "vitest": "^3.0.5"
+    "vitest": "^5.0.0"
   }
 }
