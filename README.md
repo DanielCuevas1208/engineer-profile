@@ -12,17 +12,19 @@ paths in SQLite. It publishes a static site from these records.
 - Capture repeatable project previews with Playwright.
 - Hide projects and redact author emails before publication.
 - Choose a built-in theme and override accent, radius, and font.
-  The published page applies every override to its CSS tokens.
 - Compare every theme in a generated gallery page.
 - Summarize commit activity between release windows.
 - Publish an RSS feed from visible projects.
-- Deploy the snapshot to configured local targets.
-- Sync targets and remove stale files before verification.
-- Preview local deployment changes before synchronization.
+- Deploy the snapshot to local, S3, Netlify, Vercel, or rsync targets.
+- Generate S3 upload plans with MIME types and caching headers.
+- Generate Netlify headers and redirect rules automatically.
+- Generate Vercel project configurations with clean URL routing.
+- Formulate deterministic rsync commands for remote SSH hosts.
+- Preview deployment changes before synchronization.
 - Generate JSON deployment reports for CI and release tooling.
 - Record a machine-readable manifest with every publish.
 - Run one configured refresh from a scheduled workflow.
-- Publish a refreshed snapshot to GitHub Pages with a short-lived workflow token.
+- Publish a refreshed snapshot to GitHub Pages with a workflow token.
 - Verify the artifact and the deployed HTTPS page after publication.
 
 The fixture demo runs without secrets and without network access.
@@ -44,12 +46,17 @@ flowchart LR
   S --> W
   W --> O[Static output]
   T[Theme] --> W
-  D --> F[Diff summaries]
-  F --> W
+  D --> F1[Diff summaries]
+  F1 --> W
   W --> M[Manifest]
   W --> X[RSS feed]
-  M --> K[Deploy]
+  M --> K[Deployer]
   X --> K
+  K --> A1[Local sync]
+  K --> A2[S3 storage]
+  K --> A3[Netlify]
+  K --> A4[Vercel]
+  K --> A5[Rsync SSH]
   K --> H[GitHub Pages]
 ```
 
@@ -65,7 +72,11 @@ flowchart LR
 | `src/privacy/` | Hide projects and block sensitive commit messages. |
 | `src/preview/` | Capture fixed viewport screenshots with Playwright. |
 | `src/publish/` | Render HTML, changelog files, commit-trail files, the theme gallery, the RSS feed, the site manifest, and preview assets. |
-| `src/deploy/` | Compare snapshots, compute digests, create reports, sync local targets, and verify Pages output. |
+| `src/deploy/` | Compare snapshots, compute digests, create reports, sync local targets, and dispatch remote provider adapters. |
+| `src/deploy/s3.ts` | Generate S3 sync plans, MIME types, and immutable cache-control headers. |
+| `src/deploy/netlify.ts` | Generate Netlify security headers, redirect rules, and deployment bundles. |
+| `src/deploy/vercel.ts` | Generate Vercel project configurations with clean URL routing. |
+| `src/deploy/rsync.ts` | Formulate deterministic rsync commands for remote SSH servers. |
 | `scripts/verify-pages.mjs` | Check the deployed HTTPS page after a Pages release. |
 | `fixtures/` | Provide deterministic demo data and local preview pages. |
 
@@ -166,21 +177,10 @@ The loader rejects feed base URLs that are not absolute http(s) URLs.
 
 ### Deploy
 
-Deploy syncs the published output to one or more local targets.
-A target must live outside the output directory.
-Deploy removes stale files first, then copies the new snapshot.
-It copies the snapshot, then verifies the key output files.
-Each deploy records an audit entry with the file counts.
+Deploy syncs the published output to configured targets.
+Supported adapter types are `local`, `s3`, `netlify`, `vercel`, and `rsync`.
+Each deploy records an audit entry with file counts and target URIs.
 Each report records a SHA-256 digest for the source and target snapshots.
-
-Deployment previews compare file paths and SHA-256 content hashes.
-Use the dry run before a local sync.
-It reports added, changed, removed, and unchanged files.
-It does not create or modify the target.
-
-Use `--json` when another tool must read the deployment result.
-Preview reports include file changes and snapshot digests.
-Sync reports include file counts, verification, and matching digests.
 
 ```json
 {
@@ -190,16 +190,84 @@ Sync reports include file counts, verification, and matching digests.
         "name": "public",
         "type": "local",
         "target": "deploy/public"
+      },
+      {
+        "name": "cloud-storage",
+        "type": "s3",
+        "bucket": "my-portfolio-bucket",
+        "region": "us-east-1",
+        "prefix": "site"
+      },
+      {
+        "name": "edge-preview",
+        "type": "netlify",
+        "siteId": "site-uuid-123"
+      },
+      {
+        "name": "vercel-prod",
+        "type": "vercel",
+        "projectId": "prj_portfolio"
+      },
+      {
+        "name": "remote-server",
+        "type": "rsync",
+        "host": "portfolio.internal",
+        "user": "deployer",
+        "path": "/var/www/site",
+        "port": 22
       }
     ]
   }
 }
 ```
 
-The refresh command deploys configured targets after publishing.
-Run `node dist/index.js deploy` to publish and deploy in one step.
-The command reports the file count, the removed stale count, and the verification state.
-Add `--json` to print a stable report instead of human-readable lines.
+#### Local targets
+
+A local target copies files to a designated folder.
+The target must live outside the output directory.
+Deploy removes stale files first, then copies the new snapshot.
+It verifies required files and matching SHA-256 digests.
+
+#### S3 and object storage
+
+The S3 adapter stages the snapshot and generates `s3-sync-plan.json`.
+The plan specifies content types, SHA-256 hashes, and cache headers.
+Assets receive immutable caching headers.
+HTML and RSS documents receive revalidation headers.
+The loader validates DNS-compliant bucket names.
+
+#### Netlify
+
+The Netlify adapter stages the snapshot with generated `_headers` and `_redirects`.
+It sets security headers like `X-Frame-Options` and `X-Content-Type-Options`.
+It configures asset caching and feed MIME types.
+
+#### Vercel
+
+The Vercel adapter stages the snapshot with a generated `vercel.json`.
+It configures security headers, asset caching, and clean URL routing.
+
+#### Rsync
+
+The rsync adapter generates `rsync-plan.json` with deterministic commands.
+It formulates safe transfer commands with checksum verification.
+It supports custom SSH ports and delete flags.
+
+#### Previews and reports
+
+Deployment previews compare file paths and SHA-256 content hashes.
+Use the dry run before an active deployment.
+It reports added, changed, removed, and unchanged files.
+It does not overwrite target files.
+
+Use `--json` when another tool must read the deployment result.
+Preview reports include file changes and snapshot digests.
+Sync reports include file counts, verification, and matching digests.
+
+Run `node dist/index.js deploy` to publish and deploy all targets.
+Run `node dist/index.js deploy --target <name>` to deploy one target.
+Add `--dry-run` to preview changes without syncing.
+Add `--json` to print machine-readable deployment reports.
 
 The report verifier prints this result:
 
@@ -284,11 +352,12 @@ Build before direct CLI commands.
 | `npm run gallery` | Build and write the theme gallery page. |
 | `npm run refresh` | Run configured ingest, capture, publish, and deploy stages. |
 | `node dist/index.js deploy` | Publish the snapshot and sync it to configured targets. |
+| `node dist/index.js deploy --target <name>` | Publish and deploy to a single named target. |
 | `node dist/index.js deploy --dry-run` | Publish the snapshot and preview target changes without syncing. |
 | `node dist/index.js deploy --dry-run --json` | Print a machine-readable preview report. |
 | `node dist/index.js themes` | List built-in presentation themes. |
 | `node dist/index.js themes --preview` | Write a theme gallery HTML page. |
-| `node dist/index.js status` | Show visibility and recent operations. |
+| `node dist/index.js status` | Show visibility, deploy targets, and recent operations. |
 | `npm test` | Run deterministic unit and integration tests. |
 | `npm run typecheck` | Validate TypeScript types. |
 | `npm run build` | Compile the CLI to `dist/`. |
@@ -320,7 +389,7 @@ The site displays visible projects only.
 It links project cards to repositories.
 It links release notes to their release pages.
 It records local operations in an audit table.
-Deploy operations keep their target name and verification state in the audit trail.
+Deploy operations keep their target name, target URI, and verification state in the audit trail.
 
 ## CI and test status
 
@@ -334,7 +403,7 @@ It checks the deployed HTTPS URL after publication.
 
 The test suite covers these core behaviors:
 
-- Configuration validation and default merging.
+- Configuration validation and default merging for all adapter types.
 - Conventional commit parsing.
 - Release-first changelog generation.
 - Commit-diff summaries and release-window bucketing.
@@ -348,6 +417,11 @@ The test suite covers these core behaviors:
 - Theme resolution, CSS variable emission, and gallery rendering.
 - Generated CSS token application for font and radius.
 - Local deploy sync, stale cleanup, and verification.
+- S3 upload plan creation, MIME type detection, and cache-control headers.
+- Netlify security headers and redirect rule generation.
+- Vercel project configuration and clean URL routing.
+- Rsync transfer command formulation and parameter validation.
+- Multi-target dispatch and preview comparisons.
 - Snapshot previews with deterministic added, changed, removed, and unchanged file lists.
 - Snapshot digests and preview or sync deployment reports.
 - Site manifest versioning, determinism, and theme details.
@@ -364,9 +438,8 @@ npm test
 
 ### Validation status
 
-Typecheck and build pass locally.
-The restricted Windows sandbox blocks Vitest's esbuild child process.
-CI runs the full test suite on Ubuntu.
+Typecheck, build, and tests pass locally.
+CI runs the full test suite on Ubuntu with Node 22.
 CI installs Chromium before Playwright checks.
 The fixture pipeline provides deterministic data for repeatable checks.
 The demo output feeds two verification scripts in CI.
@@ -382,12 +455,11 @@ The Pages workflow uses the same snapshot checks with a variable project count.
 - Commit-diff windows use commit dates. Release dates set the boundaries.
 - External pages can fail during capture.
 - Capture failures are reported and do not stop publishing.
-- Publishing creates local files. It does not deploy them.
+- Publishing creates local files. It does not deploy them automatically without the deploy stage.
 - Themes offer built-in palettes, selected overrides, and a generated gallery.
-- Local deploy syncs files. It does not push to hosts.
+- S3, Netlify, Vercel, and rsync adapters generate staging bundles and plans.
+- Remote upload execution requires provider credentials in the execution environment.
 - Snapshot digests identify local bytes. They do not verify a remote host.
-- GitHub Pages is the only remote publisher.
-- Other hosting providers require new adapters.
 - Pages verification needs a reachable HTTPS site.
 - A dry run publishes the local snapshot before comparison.
 - The RSS feed uses the configured base URL or the GitHub profile.
@@ -404,8 +476,9 @@ The Pages workflow uses the same snapshot checks with a variable project count.
 | v0.5 | Complete | Local deployment previews with deterministic file and content diffs. |
 | v0.6 | Complete | Snapshot digests, JSON deployment reports, and CI report verification. |
 | v0.7 | Complete | GitHub Pages publishing with short-lived workflow permissions, artifact checks, and deployed URL verification. |
-| v0.8 | Next | Provider-specific remote adapters for additional hosts. |
-| v0.9 | Later | Release brief digests and changelog archiving. |
+| v0.8 | Complete | Provider-specific remote adapters for S3-compatible object storage, Netlify, Vercel, and rsync SSH hosts. |
+| v0.9 | Next | Release brief digests and changelog archiving. |
+| v1.0 | Later | Multi-owner aggregation and custom domain certificate verification. |
 
 ## License
 

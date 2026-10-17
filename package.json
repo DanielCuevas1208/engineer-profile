@@ -1,6 +1,6 @@
 {
   "name": "engineer-profile",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Self-maintaining engineering portfolio from repository activity",
   "type": "module",
   "main": "dist/index.js",
@@ -19,6 +19,8 @@
     "publish": "npm run build && node dist/index.js publish",
     "capture": "npm run build && node dist/index.js capture",
     "gallery": "npm run build && node dist/index.js themes --preview",
+    "deploy": "npm run build && node dist/index.js deploy",
+    "themes": "npm run build && node dist/index.js themes",
     "refresh": "npm run build && node dist/index.js refresh"
   },
   "engines": {
@@ -51,6 +53,6 @@
     "playwright": "^1.50.1",
     "tsx": "^4.19.3",
     "typescript": "^7.0.2",
-    "vitest": "^3.0.5"
+    "vitest": "^5.0.0"
   }
 }
