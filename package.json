@@ -47,7 +47,7 @@
     "commander": "^15.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.50.1",
+    "@playwright/test": "^1.63.0",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^26.5.0",
     "playwright": "^1.50.1",
